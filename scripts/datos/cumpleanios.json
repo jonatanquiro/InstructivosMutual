@@ -1,0 +1,170 @@
+{
+  "_comentario": "Cargar acá los resultados de: USE [UNION]; SELECT SONOMB, SOFENA FROM somaesgral WHERE DIRECTIVO=1. 'fecha' es la fecha de nacimiento completa, formato AAAA-MM-DD (el año no se muestra en la app, solo se usa para no romper el formato de fecha).",
+
+  "personas": [
+    {
+      "nombre": "ANDRES ALFREDO ANTONIO",
+      "fecha": "1977-01-12"
+    },
+    {
+      "nombre": "FOSCHIA SILVIA MARIA",
+      "fecha": "1971-05-06"
+    },
+    {
+      "nombre": "GHIBERTO HUGO ANTONIO",
+      "fecha": "1955-05-13"
+    },
+    {
+      "nombre": "BERAUDO ADRIAN JAVIER",
+      "fecha": "1962-12-25"
+    },
+    {
+      "nombre": "ESPERTINO RICARDO DANIEL",
+      "fecha": "1962-07-24"
+    },
+    {
+      "nombre": "CATTANEO AURELIO CARLOS",
+      "fecha": "1945-12-15"
+    },
+    {
+      "nombre": "BERGESIO EXEQUIEL",
+      "fecha": "1983-04-27"
+    },
+    {
+      "nombre": "TROSSERO DANIELA LAURA",
+      "fecha": "1982-02-26"
+    },
+    {
+      "nombre": "VIGNOLO MARICEL BEATRIZ",
+      "fecha": "1968-01-31"
+    },
+    {
+      "nombre": "BORDA BOSSANA JUAN ALBERTO",
+      "fecha": "1957-07-19"
+    },
+    {
+      "nombre": "CORIA CLAUDIO ALBERTO",
+      "fecha": "1977-12-10"
+    },
+    {
+      "nombre": "TEJEDA ALICIA DEL ROSARIO",
+      "fecha": "1970-06-25"
+    },
+    {
+      "nombre": "ASSONE DIEGO IDELSO",
+      "fecha": "1981-04-24"
+    },
+    {
+      "nombre": "FERRERO ERICO LORENZO",
+      "fecha": "1952-05-25"
+    },
+    {
+      "nombre": "BUSTAMANTE ADRIANA YOLANDA",
+      "fecha": "1968-09-04"
+    },
+    {
+      "nombre": "GIULIANO RUBEN ORESTE",
+      "fecha": "1953-07-27"
+    },
+    {
+      "nombre": "BONGIOVANNI VERONICA FABIANA",
+      "fecha": "1971-03-08"
+    },
+    {
+      "nombre": "CANAVESE CLAUDIO MIGUEL",
+      "fecha": "1972-05-04"
+    },
+    {
+      "nombre": "MODINI LUIS MARCELO GABRIEL",
+      "fecha": "1962-09-07"
+    },
+    {
+      "nombre": "SEGURO GONZALO ADRIAN",
+      "fecha": "1985-05-02"
+    },
+    {
+      "nombre": "AGUILAR MIRIAN BEATRIZ",
+      "fecha": "1980-07-22"
+    },
+    {
+      "nombre": "KAÑEVSKY CAROLINA SOLEDAD",
+      "fecha": "1981-01-03"
+    },
+    {
+      "nombre": "LUQUE CESAR DARIO",
+      "fecha": "1969-03-14"
+    },
+    {
+      "nombre": "PEIRONE FLORENCIA NATALIA",
+      "fecha": "1984-10-12"
+    },
+    {
+      "nombre": "FLORES MARTIN ALEJANDRO",
+      "fecha": "1988-09-07"
+    },
+    {
+      "nombre": "INSAURRALDE EDGAR FERNANDO",
+      "fecha": "1986-07-30"
+    },
+    {
+      "nombre": "RASPO FRANCISCO FELIPE",
+      "fecha": "1989-06-07"
+    },
+    {
+      "nombre": "MARETTO WALTER CARLOS",
+      "fecha": "1984-11-20"
+    },
+    {
+      "nombre": "ESPINDOLA CRISTIAN ANDRES",
+      "fecha": "1989-03-21"
+    },
+    {
+      "nombre": "PINOTTI ANDRES SEBASTIAN",
+      "fecha": "1982-07-28"
+    },
+    {
+      "nombre": "ZURVERA MARCOS LEANDRO",
+      "fecha": "1992-05-22"
+    },
+    {
+      "nombre": "BARETTA ALEJANDRO BIENVENIDO",
+      "fecha": "1987-07-27"
+    },
+    {
+      "nombre": "ROMERO SANDRA GABRIELA",
+      "fecha": "1972-02-22"
+    },
+    {
+      "nombre": "ARESSI LAURA EVANGELINA",
+      "fecha": "1986-03-06"
+    },
+    {
+      "nombre": "MORLACHI NADIA GISELA",
+      "fecha": "1980-10-03"
+    },
+    {
+      "nombre": "BELTRAMINO SERGIO EXEQUIEL",
+      "fecha": "1990-02-18"
+    },
+    {
+      "nombre": "CARDOZO CESAR MARIANO",
+      "fecha": "1980-11-28"
+    },
+    {
+      "nombre": "RISSO GISELA BELEN",
+      "fecha": "1989-08-19"
+    },
+    {
+      "nombre": "MARINI SEBASTIAN JORGE",
+      "fecha": "1990-09-06"
+    },
+    {
+      "nombre": "MIRETTI MARISA DEL ROSARIO",
+      "fecha": "1969-06-07"
+    },
+    {
+      "nombre": "QUIRO JONATAN",
+      "fecha": "1995-06-22"
+    }
+  ]
+}

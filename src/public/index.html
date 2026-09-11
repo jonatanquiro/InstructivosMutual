@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Información Mutual</title>
+  <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
+  <script>
+    (function () {
+      var t = localStorage.getItem("tema");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-izq">
+      <img src="/img/logo-blanco.png" alt="Logo Mutual" class="logo-barra" />
+      <h1>Información Mutual</h1>
+      <span class="saludo" id="saludo"></span>
+    </div>
+  </header>
+
+  <main>
+    <div class="grilla-menu">
+      <a class="tarjeta-menu" href="/preguntas.html">
+        <span class="tarjeta-icono">❓</span>
+        <span class="tarjeta-titulo">Preguntas Frecuentes</span>
+        <span class="tarjeta-desc">Dudas sobre procesos y funcionamiento interno</span>
+      </a>
+
+      <a class="tarjeta-menu" href="https://mutualclubunion.com.ar/" target="_blank" rel="noopener">
+        <span class="tarjeta-icono">🌐</span>
+        <span class="tarjeta-titulo">Página Web</span>
+        <span class="tarjeta-desc">mutualclubunion.com.ar</span>
+      </a>
+
+      <a class="tarjeta-menu" href="https://masunion.com.ar/" target="_blank" rel="noopener">
+        <span class="tarjeta-icono">🌐</span>
+        <span class="tarjeta-titulo">Página Web TMU</span>
+        <span class="tarjeta-desc">masunion.com.ar</span>
+      </a>
+
+      <a class="tarjeta-menu" href="https://autogestion.mutualclubunion.com.ar/" target="_blank" rel="noopener">
+        <span class="tarjeta-icono">🌐</span>
+        <span class="tarjeta-titulo">Página de Consultas</span>
+        <span class="tarjeta-desc">autogestion.mutualclubunion.com.ar</span>
+      </a>
+
+      <div class="tarjeta-menu tarjeta-proximamente">
+        <span class="tarjeta-icono">📊</span>
+        <span class="tarjeta-titulo">Proyectos</span>
+        <span class="tarjeta-desc">Próximamente</span>
+      </div>
+
+      <div class="tarjeta-menu tarjeta-cumple">
+        <span class="tarjeta-icono">🎂</span>
+        <span class="tarjeta-titulo">Cumpleaños</span>
+        <div class="tarjeta-desc" id="listaCumples">Próximos cumpleaños: cargando…</div>
+      </div>
+
+      <a class="tarjeta-menu" href="/configuracion.html">
+        <span class="tarjeta-icono">⚙️</span>
+        <span class="tarjeta-titulo">Configuración</span>
+        <span class="tarjeta-desc">Tema y preferencias</span>
+      </a>
+
+      <a class="tarjeta-menu" href="/usuarios.html" id="tarjetaUsuarios" hidden>
+        <span class="tarjeta-icono">👤</span>
+        <span class="tarjeta-titulo">Usuarios</span>
+        <span class="tarjeta-desc">Crear y administrar usuarios</span>
+      </a>
+    </div>
+  </main>
+
+  <footer class="barra-inferior">
+    <button id="btnSalir" class="btn-inferior peligro">Cerrar sesión</button>
+  </footer>
+
+  <script src="/comun.js"></script>
+  <script>
+    async function mostrarTarjetaUsuariosSiAdmin() {
+      try {
+        const respuesta = await fetch("/api/auth/me");
+        const datos = await respuesta.json();
+        if (datos.rol === "admin") {
+          document.getElementById("tarjetaUsuarios").hidden = false;
+        }
+      } catch (error) {
+        // Si falla, simplemente no mostramos la tarjeta.
+      }
+    }
+
+    mostrarTarjetaUsuariosSiAdmin();
+
+    async function cargarCumples() {
+      const contenedor = document.getElementById("listaCumples");
+      try {
+        const respuesta = await fetch("/api/cumpleanios");
+        if (respuesta.status === 401) {
+          window.location.href = "/login.html";
+          return;
+        }
+        const cumples = await respuesta.json();
+        if (cumples.length === 0) {
+          contenedor.textContent = "Próximos cumpleaños: sin datos";
+          return;
+        }
+        contenedor.innerHTML =
+          "Próximos cumpleaños:<br>" +
+          cumples.map((c) => `${c.nombre} — ${c.fecha}`).join("<br>");
+      } catch (error) {
+        contenedor.textContent = "No se pudieron cargar los cumpleaños";
+      }
+    }
+
+    cargarCumples();
+  </script>
+</body>
+</html>

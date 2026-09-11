@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Configuración — Información Mutual</title>
+  <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
+  <script>
+    (function () {
+      var t = localStorage.getItem("tema");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-izq">
+      <img src="/img/logo-blanco.png" alt="Logo Mutual" class="logo-barra" />
+      <h1>Configuración</h1>
+      <span class="saludo" id="saludo"></span>
+    </div>
+  </header>
+
+  <main>
+    <div class="caja-config">
+      <div class="fila-config">
+        <div class="fila-config-texto">
+          <strong>Apariencia</strong>
+          <span>Elegí cómo se ve la aplicación</span>
+        </div>
+        <div class="selector-tema">
+          <button id="btnTemaClaro" data-tema="claro" class="activo">☀️ Claro</button>
+          <button id="btnTemaOscuro" data-tema="oscuro">🌙 Oscuro</button>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <footer class="barra-inferior">
+    <a href="/" class="btn-inferior principal">⌂ Menú principal</a>
+    <button id="btnSalir" class="btn-inferior peligro">Cerrar sesión</button>
+  </footer>
+
+  <script src="/comun.js"></script>
+  <script>
+    const botonesTema = [document.getElementById("btnTemaClaro"), document.getElementById("btnTemaOscuro")];
+
+    function marcarTemaActivo(tema) {
+      for (const boton of botonesTema) {
+        boton.classList.toggle("activo", boton.dataset.tema === tema);
+      }
+    }
+
+    async function cargarTema() {
+      try {
+        const respuesta = await fetch("/api/config");
+        if (!respuesta.ok) return;
+        const { tema } = await respuesta.json();
+        marcarTemaActivo(tema);
+      } catch (error) {
+        // Se queda con lo que haya quedado marcado por defecto.
+      }
+    }
+
+    async function elegirTema(tema) {
+      document.documentElement.setAttribute("data-theme", tema);
+      localStorage.setItem("tema", tema);
+      marcarTemaActivo(tema);
+
+      await fetch("/api/config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tema }),
+      });
+    }
+
+    for (const boton of botonesTema) {
+      boton.addEventListener("click", () => elegirTema(boton.dataset.tema));
+    }
+
+    cargarTema();
+  </script>
+</body>
+</html>

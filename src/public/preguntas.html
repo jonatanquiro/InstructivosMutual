@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Preguntas Frecuentes — Información Mutual</title>
+  <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
+  <script>
+    (function () {
+      var t = localStorage.getItem("tema");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-izq">
+      <img src="/img/logo-blanco.png" alt="Logo Mutual" class="logo-barra" />
+      <h1>Preguntas Frecuentes</h1>
+      <span class="saludo" id="saludo"></span>
+    </div>
+  </header>
+
+  <main>
+    <input type="text" class="buscador" id="buscador" placeholder="Buscar pregunta..." />
+    <div id="listaModulos">Cargando...</div>
+  </main>
+
+  <footer class="barra-inferior">
+    <a href="/" class="btn-inferior principal">⌂ Menú principal</a>
+    <button id="btnSalir" class="btn-inferior peligro">Cerrar sesión</button>
+  </footer>
+
+  <script src="/comun.js"></script>
+  <script>
+    let modulos = [];
+
+    async function cargarModulos() {
+      const respuesta = await fetch("/api/modulos");
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      modulos = await respuesta.json();
+      modulos.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+      pintarModulos(modulos);
+    }
+
+    function pintarModulos(listaModulos, abiertoPorDefecto) {
+      const contenedor = document.getElementById("listaModulos");
+      contenedor.innerHTML = "";
+
+      const modulosConPreguntas = listaModulos.filter((m) => m.preguntas.length > 0);
+
+      if (modulosConPreguntas.length === 0) {
+        contenedor.innerHTML = '<div class="sin-resultados">No se encontraron preguntas.</div>';
+        return;
+      }
+
+      for (const modulo of modulosConPreguntas) {
+        const divModulo = document.createElement("div");
+        divModulo.className = "modulo";
+
+        const tituloModulo = document.createElement("div");
+        tituloModulo.className = "modulo-titulo";
+        tituloModulo.textContent = modulo.nombre;
+
+        const divPreguntas = document.createElement("div");
+        divPreguntas.className = abiertoPorDefecto ? "modulo-preguntas abierto" : "modulo-preguntas";
+
+        for (const pregunta of modulo.preguntas) {
+          const divPregunta = document.createElement("div");
+          divPregunta.className = "pregunta";
+
+          const tituloPregunta = document.createElement("div");
+          tituloPregunta.className = "pregunta-titulo";
+          tituloPregunta.textContent = "▸ " + pregunta.pregunta;
+
+          const divRespuesta = document.createElement("div");
+          divRespuesta.className = "pregunta-respuesta";
+          divRespuesta.textContent = pregunta.respuesta;
+
+          tituloPregunta.addEventListener("click", () => {
+            const seEstabaAbriendo = !divRespuesta.classList.contains("abierto");
+            divRespuesta.classList.toggle("abierto");
+            if (seEstabaAbriendo) {
+              registrarConsulta(pregunta.id);
+            }
+          });
+
+          divPregunta.appendChild(tituloPregunta);
+          divPregunta.appendChild(divRespuesta);
+          divPreguntas.appendChild(divPregunta);
+        }
+
+        tituloModulo.addEventListener("click", () => {
+          divPreguntas.classList.toggle("abierto");
+        });
+
+        divModulo.appendChild(tituloModulo);
+        divModulo.appendChild(divPreguntas);
+        contenedor.appendChild(divModulo);
+      }
+    }
+
+    function registrarConsulta(preguntaId) {
+      // "Fire and forget": no bloqueamos la interfaz esperando esto.
+      fetch(`/api/preguntas/${preguntaId}/consulta`, { method: "POST" }).catch(() => {});
+    }
+
+    document.getElementById("buscador").addEventListener("input", (evento) => {
+      const texto = evento.target.value.trim().toLowerCase();
+
+      if (texto.length === 0) {
+        pintarModulos(modulos);
+        return;
+      }
+
+      const filtrados = modulos.map((modulo) => ({
+        ...modulo,
+        preguntas: modulo.preguntas.filter((p) => p.pregunta.toLowerCase().includes(texto)),
+      }));
+      pintarModulos(filtrados, true);
+    });
+
+    cargarModulos();
+  </script>
+</body>
+</html>

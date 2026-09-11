@@ -1,0 +1,659 @@
+{
+  "app_modulos": [
+    {
+      "id": 1,
+      "nombre": "Panteón Social / Nichos",
+      "orden": 0,
+      "activo": true
+    },
+    {
+      "id": 2,
+      "nombre": "Débitos Automáticos",
+      "orden": 1,
+      "activo": true
+    },
+    {
+      "id": 3,
+      "nombre": "Gestiones",
+      "orden": 2,
+      "activo": true
+    },
+    {
+      "id": 4,
+      "nombre": "Ayuda Económica",
+      "orden": 3,
+      "activo": true
+    },
+    {
+      "id": 5,
+      "nombre": "Caja de Ahorro",
+      "orden": 4,
+      "activo": true
+    },
+    {
+      "id": 6,
+      "nombre": "Socios",
+      "orden": 5,
+      "activo": true
+    },
+    {
+      "id": 7,
+      "nombre": "Tarjeta",
+      "orden": 6,
+      "activo": true
+    },
+    {
+      "id": 8,
+      "nombre": "Valores al Cobro",
+      "orden": 7,
+      "activo": true
+    }
+  ],
+  "app_preguntas": [
+    {
+      "id": 1,
+      "modulo_id": 1,
+      "pregunta": "¿Cómo cambiar los precios de nichos y su mantenimiento?",
+      "respuesta": "Precio de los nichos: ingresar en Ayuda Económica → Panteón Social → Nichos → Precios. En OBRA colocar 5 si aumentan los nichos simples y dobles, o 6 si aumentan los urnarios nuevos. En TIPO DE NICHO colocar 1 para simples, 2 para dobles o 3 para urnarios. Luego indicar la FILA correspondiente, colocar en MONTO el importe establecido por Silvia y GRABAR.\n\nPrecio de mantenimiento: ingresar en Ayuda Económica → Panteón Social → Costos. Colocar la fecha desde la cual entra en vigencia el aumento y el costo correspondiente a cada nicho, previamente establecido por Silvia. Luego GRABAR.",
+      "orden": 0,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.490Z"
+    },
+    {
+      "id": 2,
+      "modulo_id": 1,
+      "pregunta": "¿Cómo gestionar y entregar un permiso de nicho?",
+      "respuesta": "1) Buscar los datos del nicho en Ayuda Económica → Panteón Social → Nichos → Mantenimiento: OBRA, MÓDULO, FILA, NICHO y si es SIMPLE, DOBLE o URNARIO.\n\n2) Ingresar en Ayuda Económica → Panteón Social → Nichos → AUTORIZACIONES. Si es para ocupar un nicho propio, tildar OCUPACIÓN NICHO. Completar los datos del fallecido: si acaba de fallecer, no completar Origen ni Destino; si proviene de otro nicho, indicar como origen NICHO MUNICIPAL o el lugar de donde provenga. Completar los datos de ubicación del nicho, la fecha actual y la cochería que realiza el servicio. Completar los datos y teléfono de quien solicita el permiso y GRABAR.\n\n3) Imprimir dos copias del permiso: una para la persona que la llevará a Sunchales Servicios Sociales y otra para archivar. Ambas deben estar firmadas y con el sello correspondiente.",
+      "orden": 1,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.497Z"
+    },
+    {
+      "id": 3,
+      "modulo_id": 1,
+      "pregunta": "¿Cómo consultar los nichos emitidos?",
+      "respuesta": "Ingresar en CONSULTA DE MOVIMIENTOS y seleccionar la fecha correspondiente. El sistema mostrará el listado de todos los nichos emitidos durante ese período.",
+      "orden": 2,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.500Z"
+    },
+    {
+      "id": 4,
+      "modulo_id": 2,
+      "pregunta": "¿Cómo funcionan y cuándo se procesan los débitos automáticos generales (instituciones)?",
+      "respuesta": "Consultar listados de instituciones: ingresar en Caja de Ahorro → Movs Automáticos → Consultas → Por Código → Alfabético, y controlar los códigos correspondientes. Códigos: 9: SSS, 12: CAU, 27: Colegio San José, 213: Básquet menor, 384: fútbol infantil, 227: Centro Comercial y 16: Meridiano.\n\nModificar valores: ingresar en Caja de Ahorro → Movs Automáticos → Mantenimiento, e ingresar el código, la caja de ahorro y el importe correspondiente.\n\nPeríodo de proceso: desde el día 10 hasta el último día hábil del mes en curso, después de la acreditación de los comercios de Cabal.\n\nActualizar fecha: ingresar en Caja de Ahorro → Movs Automáticos → Actualización Fecha, dentro del período establecido.\n\nProcedimiento: ingresar en Caja de Ahorro → Movs Automáticos → Procedimiento y elegir el código correspondiente.\n\nÚltimo día de débito: enviar un mail a las instituciones informando quiénes quedaron pendientes de pago.",
+      "orden": 0,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.510Z"
+    },
+    {
+      "id": 5,
+      "modulo_id": 2,
+      "pregunta": "¿Cómo gestionar el débito de Monotributos (controlar, cargar, corregir, borrar)?",
+      "respuesta": "Controlar totales: ingresar en Gestión de Servicios → Gestiones Mensuales → Consulta, obtener el listado y controlar los totales antes de realizar el débito.\n\nRealizar el débito: ingresar en Gestión de Servicios → Gestiones Mensuales → Cargar Gestiones Mensuales → Gestión → Fecha. Sumar todos los importes marcados en verde; deben coincidir con el listado obtenido en la consulta.\n\nCargar un monotributo nuevo: ingresar en Gestiones → Gestiones Mensuales → Mantenimiento y completar número de cuenta, CUIT, código de revista e importe.\n\nCorregir un monotributo (cambio de importe): en Gestión de Servicios → Gestiones Mensuales → Mantenimiento, completar el ID (código de la planilla usada para descontar mensualmente), COD. GESTION con monotributo, CUENTA, CUIT, COD. REVISTA (también cambia si cambia el importe) e IMPORTE.\n\nBorrar un monotributo: ingresar en Gestiones → Gestiones Mensuales → Mantenimiento y colocar el ID que figura en el listado de los débitos.\n\nCuándo se procesa: el día 20 de cada mes.",
+      "orden": 1,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.517Z"
+    },
+    {
+      "id": 6,
+      "modulo_id": 2,
+      "pregunta": "¿Cómo gestionar el débito del Régimen de Trabajadores Autónomos (controlar, cargar, corregir, borrar)?",
+      "respuesta": "Controlar totales: sumar los importes correspondientes a cada régimen y controlar que el total coincida con el listado. Para obtener el listado, ingresar en Gestión de Servicios → Gestiones Mensuales → Consulta.\n\nRealizar el débito: ingresar en Gestión de Servicios → Gestiones Mensuales → Cargar Gestiones Mensuales → Gestión → Fecha. Sumar todos los importes marcados en verde; deben coincidir con el listado obtenido en la consulta.\n\nCargar uno nuevo: ingresar en Gestiones → Gestiones Mensuales → Mantenimiento y completar número de cuenta, CUIT e importe.\n\nCorregir (cambio de importe): en Gestión de Servicios → Gestiones Mensuales → Mantenimiento, completar el ID (código del listado generado el día del débito), COD. GESTION con régimen de trabajadores autónomos (RTAU), CUENTA, CUIT e IMPORTE.\n\nBorrar: ingresar en Gestiones → Gestiones Mensuales → Mantenimiento y colocar el ID que figura en el listado de los débitos.",
+      "orden": 2,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.520Z"
+    },
+    {
+      "id": 7,
+      "modulo_id": 3,
+      "pregunta": "¿Cómo realizar y controlar las gestiones del día siguiente?",
+      "respuesta": "Se pueden realizar todos los días después de las 13:00 y hasta las 16:30, ya que en Caja se procesan al día siguiente.\n\n1) Buscar los impuestos y servicios del día hábil siguiente guardados en el mueble de gestiones.\n2) Separar por tipo de gestión (por ejemplo, boletas de agua potable por un lado y de EPE por otro) y sumar los importes.\n3) Controlar el total en Gestión de Servicios → Consultas → Por Vencimiento → Por fecha; los montos sumados deben coincidir con los cargados en el sistema.\n4) Una vez que coinciden, seleccionar Aceptar, Aceptar y Sí.\n5) Entregar todas las boletas y las tiras de sumas en Caja 1.",
+      "orden": 0,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.530Z"
+    },
+    {
+      "id": 8,
+      "modulo_id": 3,
+      "pregunta": "¿Cómo realizar y controlar el proceso automático de Conectar?",
+      "respuesta": "1) Revisar los correos recibidos en atencion@mutualclubunion.com.ar y sistemas@mutualclubunion.com.ar. Deben llegar dos archivos: uno TXT y otro Excel con las boletas para controlar. Pedir a Sistemas que descargue el archivo.\n\n2) Ingresar en Ppal → SISTEMAS → GESTIÓN DE SERVICIOS → PROCESO → CONECTAR y cambiar la fecha a la fecha del débito, usando una fecha posterior a la del día para evitar que las gestiones ya hayan sido procesadas.\n\n3) Si aparece un aviso de nuevos asociados a Conectar no cargados en el sistema: tomar nota de DNI, nombre y apellido y número de cliente de Conectar (o usar el botón de Excel para imprimir el listado) y NO continuar con el proceso en ese momento. Por cada uno, ingresar en CAJA DE AHORRO → CUENTA → MANTENIMIENTO, buscar la cuenta del socio por DNI y cargar el número de cliente de Conectar sin espacios en blanco. Si un cliente de Conectar no tiene cuenta en la Mutual, llamar al 03493 15661820 (Adrián Aicardi), informar que esa factura no se procesará y continuar con el resto (o intentar ubicar la cuenta con otro dato disponible).\n\n4) Antes de finalizar, volver a SISTEMAS → GESTIÓN DE SERVICIOS → PROCESO → CONECTAR: el sistema muestra un cuadro con cantidad de boletas y total, que debe comprobarse contra el archivo Excel recibido. Si es correcto, aceptar el proceso.\n\n5) Al finalizar se generan los comprobantes verdes de gestiones, que deben archivarse en su correspondiente vencimiento.",
+      "orden": 1,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.533Z"
+    },
+    {
+      "id": 9,
+      "modulo_id": 3,
+      "pregunta": "¿Cómo realizar el proceso de Agua Potable?",
+      "respuesta": "Revisar los correos recibidos en atencion@mutualclubunion.com.ar y apinotti@mutualclubunion.com.ar, donde debe llegar un archivo TXT (las boletas físicas ya no llegan, solo el archivo). Pedir a Sistemas que lo descargue. Agua Potable envía por correo cada boleta por si un usuario quiere controlarla. Para imprimir los comprobantes verdes, ingresar en Gestión de Servicios → Procesos → Agua Potable.\n\nSi aparece una boleta nueva, cargarla en Caja de Ahorro → Cuentas → Mantenimiento → Soc. Coop. Agua, con el número de usuario que figura en la boleta.\n\nLas boletas correspondientes a Mutual Unión se entregan a Marisa.",
+      "orden": 2,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.537Z"
+    },
+    {
+      "id": 10,
+      "modulo_id": 3,
+      "pregunta": "¿Cómo realizar el proceso de impuestos cobrados por Caja?",
+      "respuesta": "1) Después de las 15:00, buscar los impuestos de las cajas (deben estar previamente sumados). Controlar los totales en Sistema → Gestión de Servicios → Cobranza por Caja → Mantenimiento: seleccionar los registros ingresados por turno, colocar la fecha del día y controlar que el total coincida con lo sumado.\n\n2) Generar comprobantes: ingresar en Sistema → Gestión de Servicios → Cobranza por Caja → Comprobantes para Caja. Verificar que el cuadro con el total coincida con el importe sumado, Aceptar y confirmar. El sistema procesa; luego imprimir todo y confirmar el envío de los mails cuando el sistema lo solicite.\n\n3) Una vez finalizado, entregar los comprobantes de Caja a la persona encargada de grabar Caja de Ahorro, y los impuestos con comprobantes ya grabados a los chicos de Caja.\n\n4) Si hace falta enviar el detalle de gestiones cobradas por Caja porque no se envió automáticamente: ingresar en Gestión de Servicios → Cobranza por Caja → Consultas → General, colocar la fecha, tildar Todos y el código de gestión necesario, Aceptar, copiar el resultado en CutePDF y enviarlo por correo a la entidad correspondiente.",
+      "orden": 3,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.540Z"
+    },
+    {
+      "id": 11,
+      "modulo_id": 3,
+      "pregunta": "¿Qué hacer ante el error 'Proceso en Curso'?",
+      "respuesta": "Consultar con Sistemas, ya que probablemente el proceso se haya iniciado de forma indebida. Antes de iniciar cualquier proceso, verificar en AuditoriaProcesos si ya fue realizado para ese día: si tiene al menos un paso realizado, el sistema no permite volver a ejecutarlo normalmente, hay que volver para atrás y procesarlo igualmente. Al finalizar, controlar que no se hayan duplicado boletas en ninguna cuenta de ahorro.",
+      "orden": 4,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.547Z"
+    },
+    {
+      "id": 12,
+      "modulo_id": 4,
+      "pregunta": "¿Qué hay que hacer diariamente con las acreditaciones de cheques y las pactadas?",
+      "respuesta": "Al llegar, realizar el proceso de acreditaciones de valores con lo acreditado en el banco informado por Silvia. El proceso deposita los cheques que se habían cargado hace 48 horas y pueden aparecer comprobantes de pactada (TP) que hay que pagar.\n\nAcreditación de cheques: primero consultar en VALOR AL COBRO → CONSULTA → X FECHA DE ACREDIT. El total debe coincidir con lo informado por Silvia; si no coincide, puede deberse a cheques de Rafaela o Moisés. Luego ingresar en VALOR AL COBRO → PROCESOS → DE C/A → ACREDIT. DE VALORES AL COBRO y realizar el proceso. Finalmente, ingresar en VALORES AL COBRO → PROCESOS → C/A → COMP. PARA CAJA. Las entradas y salidas deben dar 0; si no, puede ser necesario realizar un pago de TP. Pasar los comprobantes a Caja junto con el papel de suma que dé 0.\n\nTambién se debe controlar el fuelle de cheques del día, tanto vendidos como en garantía. Los que correspondan deben cargarse como valor al cobro: los que estaban en garantía tildando C/A y los comprados tildando Ay. Ec. Al cierre, todos los cheques se pasan por la máquina.",
+      "orden": 0,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.553Z"
+    },
+    {
+      "id": 13,
+      "modulo_id": 4,
+      "pregunta": "¿Cómo realizar el pago de una pactada (TP)?",
+      "respuesta": "Realizarlo temprano, después de la acreditación de cheques. Ingresar en AY. ECONOM. → CUOTAS → PAGO TASA PACTADA. Con ENTER seleccionar la cuenta, presionar ENTER nuevamente para mostrar los datos del cheque, presionar ENTER y luego ESC para visualizar los datos del pago. Seleccionar ACEPTAR. En este caso no se debe grabar en Caja de Ahorro; el importe se suma con la acreditación de los cheques.\n\nSi corresponde a una pactada como la de Toldo, realizar el mismo procedimiento pero, una vez acreditado el cheque, sí grabar en Caja de Ahorro para retirar el dinero de la cuenta. Se generan tres comprobantes: dos correspondientes al pago y uno al retiro.",
+      "orden": 1,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.557Z"
+    },
+    {
+      "id": 14,
+      "modulo_id": 4,
+      "pregunta": "¿Cómo realizar el débito diario de Ayuda Económica?",
+      "respuesta": "Primero consultar los préstamos que vencen en el día ingresando en AY. EC. → CERTIFICADOS → DÉBITO AUTOMÁTICO → CONSULTA → QUE VENCEN EN EL DÍA. Luego realizar el débito desde AY. EC. → CERTIFICADOS → DÉBITO AUTOMÁTICO → DÉBITO. Seleccionar ACEPTAR y luego SÍ. El proceso debita al socio y al préstamo.",
+      "orden": 2,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.563Z"
+    },
+    {
+      "id": 15,
+      "modulo_id": 4,
+      "pregunta": "¿Cómo realizar el proceso diario de Ayuda Económica?",
+      "respuesta": "Antes del cierre, aproximadamente a las 14:00, realizar el débito de Ayuda Económica. Luego ingresar en AY. EC. → PROCESO DIARIO → IMPUTACIONES e imprimir las dos planillas: ENTRADAS y SALIDAS. Buscar en Caja todos los comprobantes de pagos y otorgamientos.\n\nEn la planilla de ENTRADAS, verificar que el resultado de restar el total de SALIDAS menos el total de ENTRADAS sea igual a la suma de todos los pagos realizados durante el día. En la planilla de SALIDAS, verificar que el resultado de restar el total de ENTRADAS menos el total de SALIDAS sea igual a la suma de todos los otorgamientos realizados durante el día.\n\nUna vez controlado todo, ingresar en AY. EC. → PROCESO DIARIO → PROCESO para realizar el cierre diario.",
+      "orden": 3,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.567Z"
+    },
+    {
+      "id": 16,
+      "modulo_id": 4,
+      "pregunta": "¿Cómo pasar los cheques del día por la máquina?",
+      "respuesta": "Una vez finalizado el proceso y controlados los cheques, sellarlos y endosarlos por Marisa, Flor o Silvia. En la computadora donde está conectado el scanner, abrir el programa correspondiente desde Explorer, donde ya está cargado el usuario y contraseña. Seleccionar CREAR DEPÓSITO, cargar la cantidad de documentos y el total. Colocar cada cheque en la máquina con el valor hacia afuera y seleccionar SÍ → CREAR DEPÓSITO → AGREGAR CHEQUE.\n\nUna vez pasados todos los cheques, bajar en la pantalla hasta los documentos cargados, seleccionar la lupa y completar manualmente el importe y el CUIT. GUARDAR. Cuando el depósito esté balanceado, seleccionar CERRAR DEPÓSITO. Si está desbalanceado, significa que algún dato fue cargado incorrectamente.",
+      "orden": 4,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.570Z"
+    },
+    {
+      "id": 17,
+      "modulo_id": 4,
+      "pregunta": "¿Cómo realizar el proceso mensual de Seguro de Ayuda Económica?",
+      "respuesta": "El último día hábil de cada mes, después de imprimir las imputaciones y antes de realizar el proceso diario, realizar el proceso del Seguro. Se realizan estos pasos: AY. EC. → SEGURO → GENERAR → ACEPTAR; AY. EC. → SEGURO → REVISAR → ACEPTAR; AY. EC. → SEGURO → EXPORTAR → ACEPTAR; AY. EC. → SEGURO → ENVIAR MAIL. Se imprimen solamente las minutas. Luego, una vez realizado el proceso diario, ejecutar AY. EC. → PROCESO MENSUAL → SÍ.",
+      "orden": 5,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.573Z"
+    },
+    {
+      "id": 18,
+      "modulo_id": 4,
+      "pregunta": "¿Cómo realizar la compra de cheques y qué hacer con los cheques vendidos o en garantía?",
+      "respuesta": "Para realizar una compra de cheques, se firman los papeles de Ayuda Económica: SOLICITUD, PAGARÉ, SEGURO, ADHESIÓN y BIENES. Utilizar la cuenta de Ayuda Económica o generarla desde AY. ECON. → CUENTAS → MANTENIMIENTO. Luego ingresar en AY. ECON. → OTORGAM. → TP. Presionar ENTER, buscar el nombre de la cuenta y seleccionar ESC para cargar el cheque.\n\nLa acreditación se realiza a 48 horas desde que se carga y desde la fecha del cheque. El cheque debe ser cruzado. Seleccionar ACEPTAR, colocar cuenta contable 338 y motivo 2, GRABAR EN CAJA DE AHORRO y GRABAR. Se generan cuatro comprobantes: tres de la TP; firmar los correspondientes a archivo y Caja y entregar el restante al asociado junto con el depósito. El dinero se lleva en el momento o mediante transferencia.\n\nLos cheques vendidos a futuro se guardan por fecha en el fuelle y se revisan diariamente para cargarlos cuando llegue su fecha, como valor al cobro para que los cobre la Mutual. Si el cheque ya está en fecha, cargarlo ese mismo día tildando AY. ECON.\n\nLos cheques en garantía se cargan cuando llega su fecha, según el fuelle, como cheque común para que se acrediten en Caja de Ahorro, tildando C/A.",
+      "orden": 6,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.577Z"
+    },
+    {
+      "id": 19,
+      "modulo_id": 4,
+      "pregunta": "¿Cómo realizar una pactada (TP), renovarla o realizar una pactada de Adri?",
+      "respuesta": "Para realizar una pactada (TP), seguir los mismos pasos que para la venta de cheques, pero sin presionar ESC. Utilizar IMP. CONTABLE 338 y DESTINO 2 en la mayoría de los casos. La tasa por servicio es el interés que se cobra cuando se devuelve el dinero. Los papeles deben pasarse a Caja. Es un préstamo a corto plazo que se cobra cuando la persona deposita.\n\nCuando se renueva una pactada, se cobran los intereses y el seguro. Sumar esos importes y colocarlos en el importe que paga para que el sistema permita cargar la renovación.\n\nEn las pactadas de Adri se debe tildar LINEA COMPLEMENTO y colocar 180, que generalmente corresponde a 6 meses. Agregar DESTINO 18 si es empresa o comercio, o 2 si es personal o familia. No tiene gastos de otorgamiento, pero sí de sellado. Luego GRABAR.\n\nPara pagar una pactada, realizar el mismo procedimiento que para los cheques pero con efectivo. Si el importe supera $10.000, depositar primero en la cuenta. Si la persona entrega solamente una parte, acordar la renovación del plazo, colocar la tasa actual y seleccionar CONTINUAR.",
+      "orden": 7,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.580Z"
+    },
+    {
+      "id": 20,
+      "modulo_id": 4,
+      "pregunta": "¿Cómo otorgar un préstamo de Ayuda Económica?",
+      "respuesta": "La planilla enviada por Nadia por mail indica lo aprobado. Si el importe otorgado es diferente por ser un monto menor, aclararlo en la planilla. Siempre informar al socio la fecha de vencimiento y aclarar que, si solicita el préstamo para más adelante, la primera cuota tendrá más intereses. Verificar lo acordado utilizando AY. EC. → OTORGAMIENTOS → SIMULADOR.\n\nSolicitar DNI del titular, garante y cónyuge cuando corresponda; servicio con domicilio actual de cada uno; y los últimos tres recibos de sueldo de cada uno. Si el asociado tiene hipertensión o diabetes, debe presentar previamente la planilla correspondiente completada por su médico.\n\nPara Préstamos Impulso (línea 14), la documentación es solicitud impresa del sistema, pagaré, seguro, adhesión y manifestación de bienes. Para Préstamos Variable (línea 20), la cuota varía cada 4 cuotas y la solicitud y pagaré dependen de si son 12, 18 o 24 cuotas.\n\nPara otorgar el préstamo, elegir la línea correspondiente: hasta 12 cuotas y hasta $1.500.000 corresponde a línea 14 PRESTAMOS IMPULSO; para 18 o 24 cuotas corresponde línea 20 VARIABLE. Completar la cuenta de Ayuda Económica del titular o generarla desde AY. EC. → CUENTAS → MANTENIMIENTO. Cargar el importe acordado, fecha de vencimiento y cantidad de cuotas. Preguntar al asociado el destino, cargarlo en el sistema y escribirlo también en la solicitud.\n\nTildar GRABAR EN CAJA DE AHORRO y seleccionar GRABAR. Se generan tres hojas blancas A4: hacer firmar por el titular las que dicen CAJA y ARCHIVO y entregar al asociado la que dice ASOCIADO, sellada junto con el depósito. Realizar el retiro de la cuenta y pasarlo a Caja, descontando siempre la cuota de socio.\n\nDespués de cada otorgamiento completar toda la información y cargar inmediatamente la GARANTÍA. Registrar los datos del titular, pareja y garante/s: teléfonos, domicilios, lugares de trabajo, teléfono del trabajo, nombre del empleador y relación con el titular cuando corresponda.",
+      "orden": 8,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.587Z"
+    },
+    {
+      "id": 21,
+      "modulo_id": 4,
+      "pregunta": "¿Cómo gestionar los reclamos de Ayuda Económica por cuotas vencidas?",
+      "respuesta": "Todos los días, del 1 al 30/31 de cada mes, consultar sin imprimir los listados de cuotas vencidas en HOJA DE RUTA: Ayuda Económica → Consulta → Saldos vencidos → Por plazos mayores. Revisar los rangos de 1 a 30 días, 31 a 60, 61 a 90, 91 a 120 y 121 a 99999 días, marcando definitivo en este último caso.\n\nCon el número de cuenta, ingresar a Consultas → Por cuenta y revisar el estado del titular, comentarios, garantes y lugares de trabajo. Si existe deuda en tarjeta, también debe notificarse porque forma parte de la deuda conjunta con la Mutual.\n\nPrimero llamar al titular e informar la deuda vencida y que pasaron más de 30 días sin entregar. Si no responde, seguir el circuito: lugar de trabajo, familiares (pareja, padres, hijos, hermanos) y luego garantes. También se puede llamar al empleador que no sea garante para intentar ubicar al titular. Se debe mantener un trato amable, cordial y firme, conocer previamente el historial y buscar alternativas para ayudar al asociado a ponerse al día. Si debe más de una cuota, intentar acordar la entrega de más de una cuota o pagos parciales periódicos.\n\nRegistrar las respuestas en los comentarios en minúscula, indicando el usuario que realizó el llamado y dejando información concreta y útil para quien continúe el reclamo. Por ejemplo, si el titular informa que irá el día 15 a entregar una cuota y media, agendar el día 16 para verificar si cumplió. Evitar comentarios genéricos como 'dejé WhatsApp' o 'no contesta'.\n\nSi se agotaron las distintas vías de contacto e interlocutores, y existen ingresos demostrables, garantías u otros elementos para iniciar acciones, enviar el caso a Vero con el detalle de todos los intentos de cobranza para que pueda continuar con la intimación y eventual inicio de juicio.",
+      "orden": 9,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.590Z"
+    },
+    {
+      "id": 22,
+      "modulo_id": 5,
+      "pregunta": "¿Cómo registrar correctamente un depósito de dinero en Caja de Ahorro?",
+      "respuesta": "Cuando un asociado deposita dinero en su Caja de Ahorro, ingresar en Caja de Ahorro → Comprobantes → Emitir. Seleccionar la cuenta, utilizar el movimiento 30 para un depósito y emitir el comprobante.",
+      "orden": 0,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.600Z"
+    },
+    {
+      "id": 23,
+      "modulo_id": 5,
+      "pregunta": "¿Cómo evitar duplicar operaciones en el acumulado anual al realizar depósitos, préstamos, ahorros o pagos?",
+      "respuesta": "Cuando una operación utiliza dinero que ya estaba depositado en la Caja de Ahorro, debe indicarse en el sistema que el comprobante proviene de Caja de Ahorro para evitar que vuelva a sumarse al acumulado anual.\n\nEn Ahorro a Término, ingresar en Ahorro a Término → Comprobantes → Emisiones, seleccionar cuenta, plazo y tasa. Si el dinero estaba en Caja de Ahorro, tildar GRABA COMP. CA. Si el dinero es entregado en el momento, no tildar esa opción. Las renovaciones no se acumulan si se realizan por el mismo importe más intereses o por un importe menor; si la renovación es por un importe mayor, se acumula la diferencia.\n\nEn Ayuda Económica, al otorgar un préstamo desde Ayuda Económica → Otorgamiento → TD/SF/TV, seleccionar cuenta, monto, vencimiento de la primera cuota, plazo y destino. Si el asociado no retira el dinero y lo deposita en su Caja de Ahorro, tildar GRABA COMP. C.A. para evitar duplicar el acumulado. Para los pagos de cuotas, si el dinero se retira de Caja de Ahorro, tampoco se suma al acumulado anual el valor de la cuota.\n\nEn Tarjeta Mutual → Usuarios → Pago TMU → Mantenimiento, seleccionar la tarjeta y cargar el importe. Si el pago se realiza retirando dinero de Caja de Ahorro, tildar GRABA COMP. CA.",
+      "orden": 1,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.603Z"
+    },
+    {
+      "id": 24,
+      "modulo_id": 6,
+      "pregunta": "¿Cómo cargar los datos filiatorios de un asociado?",
+      "respuesta": "Ingresar en Socios → Datos de Socios → Mantenimiento y seleccionar el tipo de persona.\n\nPara personas físicas se completan las pestañas Datos Generales, Datos Cónyuge y Datos Laborales. La pestaña Perfil del Socio es confeccionada por el soporte operativo del Oficial de Cumplimiento y/o los encargados de cada sucursal con la documentación proporcionada por el asociado.\n\nPara personas jurídicas se completan las pestañas Datos Generales, Datos Laborales, Exclusivo Mutual y Rep. Legal.",
+      "orden": 0,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.610Z"
+    },
+    {
+      "id": 25,
+      "modulo_id": 6,
+      "pregunta": "¿Cómo realizar y controlar el proceso diario de Socios?",
+      "respuesta": "Al finalizar el día, antes de procesar, emitir el comprobante contable y compararlo con la suma de todas las cuotas sociales cobradas durante el día. Ambas sumas deben coincidir antes de realizar el proceso.",
+      "orden": 1,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.613Z"
+    },
+    {
+      "id": 26,
+      "modulo_id": 6,
+      "pregunta": "¿Cómo funcionan los acumulados de operaciones y las alertas de los asociados?",
+      "respuesta": "El sistema registra por cada asociado, día a día, las operaciones que representan entradas de fondos, como depósitos en Ahorro Mutual Variable, pagos de Ayudas Económicas, depósitos en Ahorro a Término, pagos de Tarjeta, cobro de Cuota Societaria y depósitos en bancos de la Mutual. Se puede consultar el acumulado desde el 01/01 de cada año hasta la fecha actual, filtrando por producto, día y operación.\n\nLos acumulados se controlan diariamente contra el perfil de cada asociado. Cuando el acumulado supera el perfil, el sistema genera una alerta basada en riesgo. Estas alertas pueden consultarse en VARIOS → CONSULTA GERENCIA → CONSULTA ALERTAS.\n\nLa consulta permite ver la fecha de generación y actualización, asociado, días en el estado actual, importe acumulado, perfil, exceso que generó la alerta, estado y observaciones. También permite filtrar por estado —Emitidas, Vencidas, Con Seguimiento, Justificadas y No Justificadas— y por sucursal, además de ordenar las columnas.\n\nSi una alerta se encuentra emitida, vencida o con seguimiento, el sistema no genera otra por el mismo exceso. Si la alerta fue justificada y posteriormente el acumulado vuelve a superar el perfil, se genera una nueva alerta.",
+      "orden": 2,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.620Z"
+    },
+    {
+      "id": 27,
+      "modulo_id": 6,
+      "pregunta": "¿Cómo funciona la Matriz de Riesgo de los asociados?",
+      "respuesta": "La Matriz de Riesgo determina el nivel de riesgo del asociado a partir de seis parámetros: Producto, Actividad, Antigüedad, Localidad, Tipo de Persona y Monto Operado.\n\nSegún el resultado se determina la vigencia del perfil: 3 años para riesgo bajo, 2 años para riesgo medio y 1 año para riesgo alto. Los impactos y parámetros pueden modificarse desde el botón A/B/M Parámetros.\n\nLa matriz se ejecuta el primer día hábil del año y considera los acumulados del año anterior. Para asociados nuevos o cuando se actualizan datos, puede ejecutarse mediante el botón Actualizar Matriz.\n\nPara los asociados incorporados durante el año, cuando todavía no existen datos sobre el producto más utilizado y el acumulado anual, el sistema asigna por defecto impactos medios en esas variables. En caso de PEP, se considera riesgo alto.",
+      "orden": 3,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.623Z"
+    },
+    {
+      "id": 28,
+      "modulo_id": 6,
+      "pregunta": "¿Cómo se cargan y mantienen los perfiles de los asociados?",
+      "respuesta": "Los perfiles se determinan según el Manual de Procedimientos de Prevención de Lavado de Activos y Financiación del Terrorismo y el importe obtenido del formulario “Determinación Perfil del Asociado”.\n\nEl perfil se carga desde el Módulo Asociados y, inicialmente, tiene una vigencia de 2 años. Puede modificarse cuando el asociado presenta nueva documentación, por ejemplo ante una alerta por operación inusual dentro de los parámetros definidos.\n\nLa carga es realizada por el Soporte Operativo del Oficial de Cumplimiento y aprobada por la Gerencia según el esquema de seguridad definido por Sistemas. El perfil se migra automáticamente al Software de Prevención de Lavado para comparar el acumulado anual de operaciones que representan ingresos de fondos con el perfil del asociado.",
+      "orden": 4,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.630Z"
+    },
+    {
+      "id": 29,
+      "modulo_id": 7,
+      "pregunta": "¿Cómo descargar los archivos MOVI y LIQUI de Cabal?",
+      "respuesta": "Ingresar a la página de Cabal y utilizar la opción BAJAR con la fecha del día. El archivo MOVI y el archivo LIQUI siempre corresponden a la fecha del día anterior.\n\nGuardar los archivos en F:\\Textos\\sistemas\\CABAL\\Cupones.\n\nPara descargar el MOVI desde el sistema: SISTEMAS → TARJETA MUTUAL → CUPONES → CUPONES CABAL → DESCARGA ARCHIVO DIARIO. Colocar la fecha del día anterior y comenzar el proceso.",
+      "orden": 0,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.640Z"
+    },
+    {
+      "id": 30,
+      "modulo_id": 7,
+      "pregunta": "¿Cómo realizar el proceso diario de pago a comercios de Tarjeta Mutual?",
+      "respuesta": "Para procesar el archivo LIQUI:\n\n1) SISTEMA → TARJETA MUTUAL → PROCESO → DIARIO → PROCESAR ARCHIVO LIQUIDACIONES. Aceptar todos los carteles que aparezcan. No genera comprobantes.\n\n2) SISTEMA → TARJETA MUTUAL → PROCESOS → DIARIO → ACREDITAR PAGOS. Aparece el monto total a pagar. Seleccionar SI para comenzar el proceso.\n\n3) SISTEMA → TARJETA MUTUAL → PROCESOS DIARIO → GRABAR MINUTA. Genera dos comprobantes y luego solicita una fecha. Colocar la fecha del día actual para que termine de generar los comprobantes.\n\n4) SISTEMA → TARJETA MUTUAL → PROCESO → DIARIO → COBRAR CUOTA COMERCIOS. No siempre existen cuotas por cobrar; si no hay, no genera comprobantes.\n\n5) SISTEMA → TARJETA MUTUAL → PROCESO → DIARIO → RETIROS COMERCIOS ZONAS. Aceptar las confirmaciones y generar los comprobantes.\n\nAl finalizar, enviar el mail informando el pago a las sucursales.",
+      "orden": 1,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.643Z"
+    },
+    {
+      "id": 31,
+      "modulo_id": 7,
+      "pregunta": "¿Cómo enviar el mail de pago a las sucursales y descargar el archivo para Tesorería?",
+      "respuesta": "Ingresar en SISTEMA → TARJETA MUTUAL → COMERCIO → CONSULTA → LIQUIDACIONES → POR COMERCIO. Colocar la fecha del día actual en ambos casilleros, seleccionar sucursal 1 y tildar ENVIAR MAILS. Luego realizar el mismo procedimiento para la sucursal 2 y finalmente para la sucursal 3.\n\nDespués de las 10:30 hs descargar el archivo para Silvia y guardarlo en F:\\Textos\\CABAL\\TESORERIA. El archivo es DetCmp_515_fecha del día (archivo rojo) - FINAL.",
+      "orden": 2,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.647Z"
+    },
+    {
+      "id": 32,
+      "modulo_id": 7,
+      "pregunta": "¿Cómo generar y subir los maestros a Cabal?",
+      "respuesta": "Por la tarde, a las 16:15 hs, ingresar en SISTEMA → TARJETA MUTUAL → USUARIOS → GENERACIÓN DE MAESTROS. Colocar la fecha del día anterior y ejecutar el proceso.\n\nAl finalizar, subir los archivos a la página de Cabal mediante SUBIR → CARGAR, utilizando la carpeta F:\\Textos\\CABAL. Los archivos a subir son SUNPLAS y SUNCUEN.",
+      "orden": 3,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.650Z"
+    },
+    {
+      "id": 33,
+      "modulo_id": 8,
+      "pregunta": "¿Cómo realizar una compra de cheques y gestionar los cheques vendidos o en garantía?",
+      "respuesta": "Para comprar cheques, firmar los papeles de Ayuda Económica: SOLICITUD, PAGARÉ, SEGURO, ADHESIÓN y BIENES. Utilizar la cuenta de Ayuda Económica del asociado o generarla si no tiene.\n\nIngresar en AY. ECON. → OTORGAM. → TP. Presionar ENTER, ENTER, buscar el nombre de la cuenta y presionar ESC para seleccionar el cheque. La acreditación debe ser de 48 horas desde que se carga y desde la fecha del cheque, que se deposita en el banco como cruzado. Presionar ACEPTAR, colocar cuenta contable 338, motivo 2, GRABAR EN CAJA DE AHORRO y GRABAR.\n\nSe generan 4 comprobantes: 3 corresponden a la TP; firmar los de archivo y Caja. El restante se entrega al asociado junto con el comprobante del depósito. El dinero se entrega en el momento o mediante transferencia.\n\nLos cheques vendidos a futuro deben guardarse por fecha en el fuelle y revisarse diariamente. Cuando llega su fecha, cargarlos como valor al cobro para que la Mutual pueda cobrarlos. Si el cheque está en fecha, cargarlo el mismo día tildando AY. ECON.\n\nLos cheques EN GARANTÍA se cargan cuando llega su fecha, según el control del fuelle, como cheque común para que se acrediten en Caja de Ahorro, tildando C/A.",
+      "orden": 0,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.653Z"
+    },
+    {
+      "id": 34,
+      "modulo_id": 8,
+      "pregunta": "¿Cómo realizar la acreditación de cheques y el pago de las tasas pactadas (TP)?",
+      "respuesta": "Cada día se acreditan los cheques en el banco. Silvia informa los valores cobrados para acreditar en las cuentas o pagar los cheques comprados. Avisar a Fer y Stella si hay cheques de ellos y registrar la información en el Word “Acreditaciones valores al cobro”.\n\n1) Controlar los valores ingresando en VALOR AL COBRO → CONSULTA → X FECHA DE ACREDIT. El total debe coincidir con lo informado por Silvia. Si no coincide, puede deberse a cheques de Rafaela o Moisés.\n\n2) Ingresar en VALOR AL COBRO → PROCESOS → DE C/A → ACREDIT. DE VALORES AL COBRO para realizar la acreditación.\n\n3) Ingresar en VALORES AL COBRO → PROCESOS → C/A → COMP. PARA CAJA. Las entradas y salidas deben dar 0. Si no da 0, puede ser necesario realizar un pago de TP que, sumado a la acreditación de los cheques, complete el importe. Pasar los comprobantes a Caja junto con el papel de suma que da 0.\n\nTambién pueden aparecer comprobantes de pactadas (TP) que deben pagarse.\n\nEl pago de TP CHEQUES debe realizarse temprano, después de la acreditación. Ingresar en AY. ECON. → CUOTAS → PAGO TASA PACTADA. Seleccionar la cuenta con ENTER, ENTER; luego ENTER, ENTER para visualizar los datos del cheque; presionar ENTER y ESC para mostrar los datos del pago. Presionar ACEPTAR. En el caso en que no corresponda grabar en C/A, no hacerlo y sumar el pago con la acreditación de los cheques.\n\nSi corresponde retirar el dinero de la Caja de Ahorro, seleccionar SI para grabar en C/A una vez acreditado el cheque. Se generan 3 comprobantes: dos del pago y uno del retiro.",
+      "orden": 1,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.660Z"
+    },
+    {
+      "id": 35,
+      "modulo_id": 8,
+      "pregunta": "¿Cómo controlar y cargar los cheques del día?",
+      "respuesta": "Controlar diariamente el fuelle de cheques, tanto los vendidos como los que están en garantía. Cuando corresponda cargarlos como valor al cobro, hacerlo como siempre, teniendo en cuenta que los cheques en garantía deben llevar tildada la opción C/A y los cheques comprados deben llevar tildada la opción AY. ECON.\n\nAl cierre, los cheques del día se pasan por la máquina de cheques.",
+      "orden": 2,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.663Z"
+    },
+    {
+      "id": 36,
+      "modulo_id": 8,
+      "pregunta": "¿Cómo pasar los cheques del día por la máquina?",
+      "respuesta": "Una vez que todos los controles dan correctamente, sellar y endosar los cheques del día por Marisa, Flor o Silvia.\n\nEn la computadora donde está el scanner, buscar el icono del programa y abrir Explorer; el usuario y la contraseña ya están cargados. Seleccionar CREAR DEPÓSITO y cargar la cantidad de documentos y el total.\n\nColocar cada cheque en la máquina con el valor hacia afuera y seleccionar SI → CREAR DEPÓSITO → AGREGAR CHEQUE.\n\nUna vez que pasaron todos los cheques, bajar en la pantalla hasta los documentos cargados, hacer clic en la lupa y completar manualmente el importe y el CUIT. Presionar GUARDAR.\n\nCuando el depósito queda balanceado, seleccionar CERRAR DEPÓSITO. Si queda desbalanceado, significa que algún dato fue cargado incorrectamente.",
+      "orden": 3,
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:25:26.667Z"
+    }
+  ],
+  "app_usuarios": [
+    {
+      "id": 2,
+      "nombre_usuario": "admin",
+      "nombre_completo": "Administrador",
+      "password_hash": "$2b$10$DIDfFer5prhv9QY7UUt0iO0sqLyuCqX3VA4VvDRDbU6E1pGUJkTtO",
+      "rol": "admin",
+      "activo": true,
+      "fecha_creacion": "2026-09-11T13:51:40.885Z",
+      "ultimo_login": "2026-09-11T17:12:19.540Z"
+    },
+    {
+      "id": 3,
+      "nombre_usuario": "daniela",
+      "nombre_completo": "Daniela Trossero",
+      "password_hash": "$2b$10$6DGlj.HmH7E1Sf4fs/CJD.fL3DhRKSI4nYZuXlPndncup9gQQ7aBS",
+      "rol": "admin",
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:53:35.354Z",
+      "ultimo_login": null
+    },
+    {
+      "id": 4,
+      "nombre_usuario": "silvia",
+      "nombre_completo": "Silvia Foschia",
+      "password_hash": "$2b$10$nsEmaUdDgfCU7CW.Tj0oteDJ/SKw6JghjKsDeq8wuoHr/2hNnJ/PG",
+      "rol": "admin",
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:53:44.395Z",
+      "ultimo_login": null
+    },
+    {
+      "id": 5,
+      "nombre_usuario": "negrucho",
+      "nombre_completo": "Alfredo Andres",
+      "password_hash": "$2b$10$IihnJ7G0CbgtTBoZTe6GTe0dxqau6n38mjwDvYN/1c3jkVFxGpoa.",
+      "rol": "usuario",
+      "activo": true,
+      "fecha_creacion": "2026-09-11T16:53:53.914Z",
+      "ultimo_login": "2026-09-11T16:56:18.056Z"
+    }
+  ],
+  "app_config_usuario": [
+    {
+      "usuario_id": 2,
+      "tema": "oscuro"
+    }
+  ],
+  "app_cumpleanios": [
+    {
+      "id": 1,
+      "nombre": "ANDRES ALFREDO ANTONIO",
+      "fecha_nacimiento": "1977-01-12T00:00:00.000Z"
+    },
+    {
+      "id": 2,
+      "nombre": "FOSCHIA SILVIA MARIA",
+      "fecha_nacimiento": "1971-05-06T00:00:00.000Z"
+    },
+    {
+      "id": 3,
+      "nombre": "GHIBERTO HUGO ANTONIO",
+      "fecha_nacimiento": "1955-05-13T00:00:00.000Z"
+    },
+    {
+      "id": 4,
+      "nombre": "BERAUDO ADRIAN JAVIER",
+      "fecha_nacimiento": "1962-12-25T00:00:00.000Z"
+    },
+    {
+      "id": 5,
+      "nombre": "ESPERTINO RICARDO DANIEL",
+      "fecha_nacimiento": "1962-07-24T00:00:00.000Z"
+    },
+    {
+      "id": 6,
+      "nombre": "CATTANEO AURELIO CARLOS",
+      "fecha_nacimiento": "1945-12-15T00:00:00.000Z"
+    },
+    {
+      "id": 7,
+      "nombre": "BERGESIO EXEQUIEL",
+      "fecha_nacimiento": "1983-04-27T00:00:00.000Z"
+    },
+    {
+      "id": 8,
+      "nombre": "TROSSERO DANIELA LAURA",
+      "fecha_nacimiento": "1982-02-26T00:00:00.000Z"
+    },
+    {
+      "id": 9,
+      "nombre": "VIGNOLO MARICEL BEATRIZ",
+      "fecha_nacimiento": "1968-01-31T00:00:00.000Z"
+    },
+    {
+      "id": 10,
+      "nombre": "BORDA BOSSANA JUAN ALBERTO",
+      "fecha_nacimiento": "1957-07-19T00:00:00.000Z"
+    },
+    {
+      "id": 11,
+      "nombre": "CORIA CLAUDIO ALBERTO",
+      "fecha_nacimiento": "1977-12-10T00:00:00.000Z"
+    },
+    {
+      "id": 12,
+      "nombre": "TEJEDA ALICIA DEL ROSARIO",
+      "fecha_nacimiento": "1970-06-25T00:00:00.000Z"
+    },
+    {
+      "id": 13,
+      "nombre": "ASSONE DIEGO IDELSO",
+      "fecha_nacimiento": "1981-04-24T00:00:00.000Z"
+    },
+    {
+      "id": 14,
+      "nombre": "FERRERO ERICO LORENZO",
+      "fecha_nacimiento": "1952-05-25T00:00:00.000Z"
+    },
+    {
+      "id": 15,
+      "nombre": "BUSTAMANTE ADRIANA YOLANDA",
+      "fecha_nacimiento": "1968-09-04T00:00:00.000Z"
+    },
+    {
+      "id": 16,
+      "nombre": "GIULIANO RUBEN ORESTE",
+      "fecha_nacimiento": "1953-07-27T00:00:00.000Z"
+    },
+    {
+      "id": 17,
+      "nombre": "BONGIOVANNI VERONICA FABIANA",
+      "fecha_nacimiento": "1971-03-08T00:00:00.000Z"
+    },
+    {
+      "id": 18,
+      "nombre": "CANAVESE CLAUDIO MIGUEL",
+      "fecha_nacimiento": "1972-05-04T00:00:00.000Z"
+    },
+    {
+      "id": 19,
+      "nombre": "MODINI LUIS MARCELO GABRIEL",
+      "fecha_nacimiento": "1962-09-07T00:00:00.000Z"
+    },
+    {
+      "id": 20,
+      "nombre": "SEGURO GONZALO ADRIAN",
+      "fecha_nacimiento": "1985-05-02T00:00:00.000Z"
+    },
+    {
+      "id": 21,
+      "nombre": "AGUILAR MIRIAN BEATRIZ",
+      "fecha_nacimiento": "1980-07-22T00:00:00.000Z"
+    },
+    {
+      "id": 22,
+      "nombre": "KAÑEVSKY CAROLINA SOLEDAD",
+      "fecha_nacimiento": "1981-01-03T00:00:00.000Z"
+    },
+    {
+      "id": 23,
+      "nombre": "LUQUE CESAR DARIO",
+      "fecha_nacimiento": "1969-03-14T00:00:00.000Z"
+    },
+    {
+      "id": 24,
+      "nombre": "PEIRONE FLORENCIA NATALIA",
+      "fecha_nacimiento": "1984-10-12T00:00:00.000Z"
+    },
+    {
+      "id": 25,
+      "nombre": "FLORES MARTIN ALEJANDRO",
+      "fecha_nacimiento": "1988-09-07T00:00:00.000Z"
+    },
+    {
+      "id": 26,
+      "nombre": "INSAURRALDE EDGAR FERNANDO",
+      "fecha_nacimiento": "1986-07-30T00:00:00.000Z"
+    },
+    {
+      "id": 27,
+      "nombre": "RASPO FRANCISCO FELIPE",
+      "fecha_nacimiento": "1989-06-07T00:00:00.000Z"
+    },
+    {
+      "id": 28,
+      "nombre": "MARETTO WALTER CARLOS",
+      "fecha_nacimiento": "1984-11-20T00:00:00.000Z"
+    },
+    {
+      "id": 29,
+      "nombre": "ESPINDOLA CRISTIAN ANDRES",
+      "fecha_nacimiento": "1989-03-21T00:00:00.000Z"
+    },
+    {
+      "id": 30,
+      "nombre": "PINOTTI ANDRES SEBASTIAN",
+      "fecha_nacimiento": "1982-07-28T00:00:00.000Z"
+    },
+    {
+      "id": 31,
+      "nombre": "ZURVERA MARCOS LEANDRO",
+      "fecha_nacimiento": "1992-05-22T00:00:00.000Z"
+    },
+    {
+      "id": 32,
+      "nombre": "BARETTA ALEJANDRO BIENVENIDO",
+      "fecha_nacimiento": "1987-07-27T00:00:00.000Z"
+    },
+    {
+      "id": 33,
+      "nombre": "ROMERO SANDRA GABRIELA",
+      "fecha_nacimiento": "1972-02-22T00:00:00.000Z"
+    },
+    {
+      "id": 34,
+      "nombre": "ARESSI LAURA EVANGELINA",
+      "fecha_nacimiento": "1986-03-06T00:00:00.000Z"
+    },
+    {
+      "id": 35,
+      "nombre": "MORLACHI NADIA GISELA",
+      "fecha_nacimiento": "1980-10-03T00:00:00.000Z"
+    },
+    {
+      "id": 36,
+      "nombre": "BELTRAMINO SERGIO EXEQUIEL",
+      "fecha_nacimiento": "1990-02-18T00:00:00.000Z"
+    },
+    {
+      "id": 37,
+      "nombre": "CARDOZO CESAR MARIANO",
+      "fecha_nacimiento": "1980-11-28T00:00:00.000Z"
+    },
+    {
+      "id": 38,
+      "nombre": "RISSO GISELA BELEN",
+      "fecha_nacimiento": "1989-08-19T00:00:00.000Z"
+    },
+    {
+      "id": 39,
+      "nombre": "MARINI SEBASTIAN JORGE",
+      "fecha_nacimiento": "1990-09-06T00:00:00.000Z"
+    },
+    {
+      "id": 40,
+      "nombre": "MIRETTI MARISA DEL ROSARIO",
+      "fecha_nacimiento": "1969-06-07T00:00:00.000Z"
+    },
+    {
+      "id": 41,
+      "nombre": "QUIRO JONATAN",
+      "fecha_nacimiento": "1995-06-22T00:00:00.000Z"
+    }
+  ],
+  "app_consultas_log": [
+    {
+      "id": 39,
+      "usuario_id": 2,
+      "pregunta_id": 29,
+      "fecha": "2026-09-11T16:52:54.687Z"
+    },
+    {
+      "id": 40,
+      "usuario_id": 2,
+      "pregunta_id": 30,
+      "fecha": "2026-09-11T16:52:56.837Z"
+    },
+    {
+      "id": 41,
+      "usuario_id": 2,
+      "pregunta_id": 31,
+      "fecha": "2026-09-11T16:52:59.640Z"
+    },
+    {
+      "id": 42,
+      "usuario_id": 2,
+      "pregunta_id": 32,
+      "fecha": "2026-09-11T16:53:01.043Z"
+    }
+  ]
+}

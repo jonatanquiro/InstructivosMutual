@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Ingresar — Información Mutual</title>
+  <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
+  <script>
+    (function () {
+      var t = localStorage.getItem("tema");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <div class="pantalla-login">
+    <form class="caja-login" id="formLogin">
+      <img src="/img/logo-mutual.png" alt="Logo" class="logo-login logo-login-claro" />
+      <img src="/img/logo-blanco.png" alt="Logo" class="logo-login logo-login-oscuro" />
+      <h1>Información Mutual</h1>
+      <div class="error" id="mensajeError"></div>
+
+      <label for="usuario">Usuario</label>
+      <input type="text" id="usuario" name="usuario" autocomplete="username" required />
+
+      <label for="password">Contraseña</label>
+      <input type="password" id="password" name="password" autocomplete="current-password" required />
+
+      <button type="submit">Ingresar</button>
+    </form>
+  </div>
+
+  <script>
+    const formulario = document.getElementById("formLogin");
+    const mensajeError = document.getElementById("mensajeError");
+
+    formulario.addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      mensajeError.textContent = "";
+
+      const usuario = document.getElementById("usuario").value.trim();
+      const password = document.getElementById("password").value;
+
+      try {
+        const respuesta = await fetch("/api/auth/login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ usuario, password }),
+        });
+        const datos = await respuesta.json();
+
+        if (!respuesta.ok) {
+          mensajeError.textContent = datos.error || "No se pudo iniciar sesión";
+          return;
+        }
+
+        window.location.href = "/";
+      } catch (error) {
+        mensajeError.textContent = "No se pudo conectar con el servidor";
+      }
+    });
+  </script>
+</body>
+</html>

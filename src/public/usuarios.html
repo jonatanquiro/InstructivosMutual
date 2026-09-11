@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Gestión de Usuarios — Información Mutual</title>
+  <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
+  <script>
+    (function () {
+      var t = localStorage.getItem("tema");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-izq">
+      <img src="/img/logo-blanco.png" alt="Logo Mutual" class="logo-barra" />
+      <h1>Gestión de Usuarios</h1>
+      <span class="saludo" id="saludo"></span>
+    </div>
+  </header>
+
+  <main>
+    <div class="caja-usuarios">
+      <h2>Crear usuario</h2>
+      <form id="formCrear" class="form-usuario">
+        <div class="error" id="errorCrear"></div>
+        <label for="nuevoUsuario">Usuario</label>
+        <input type="text" id="nuevoUsuario" required autocomplete="off" />
+
+        <label for="nuevoNombre">Nombre completo</label>
+        <input type="text" id="nuevoNombre" required autocomplete="off" />
+
+        <label for="nuevoPassword">Contraseña</label>
+        <input type="password" id="nuevoPassword" required autocomplete="new-password" />
+
+        <label for="nuevoRol">Rol</label>
+        <select id="nuevoRol">
+          <option value="usuario">usuario</option>
+          <option value="admin">admin</option>
+        </select>
+
+        <button type="submit">Crear usuario</button>
+      </form>
+    </div>
+
+    <h2>Usuarios existentes</h2>
+    <div id="listaUsuarios">Cargando...</div>
+  </main>
+
+  <footer class="barra-inferior">
+    <a href="/" class="btn-inferior principal">⌂ Menú principal</a>
+    <button id="btnSalir" class="btn-inferior peligro">Cerrar sesión</button>
+  </footer>
+
+  <script src="/comun.js"></script>
+  <script>
+    async function cargarUsuarios() {
+      const contenedor = document.getElementById("listaUsuarios");
+      const respuesta = await fetch("/api/usuarios");
+
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      if (respuesta.status === 403) {
+        contenedor.innerHTML = '<div class="sin-resultados">No tenés permisos para ver esta página.</div>';
+        return;
+      }
+
+      const usuarios = await respuesta.json();
+      pintarUsuarios(usuarios);
+    }
+
+    function pintarUsuarios(usuarios) {
+      const contenedor = document.getElementById("listaUsuarios");
+      contenedor.innerHTML = "";
+
+      const tabla = document.createElement("table");
+      tabla.className = "tabla-usuarios";
+      tabla.innerHTML = `
+        <thead>
+          <tr>
+            <th>Usuario</th>
+            <th>Nombre completo</th>
+            <th>Rol</th>
+            <th>Activo</th>
+            <th>Último login</th>
+            <th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      `;
+
+      const tbody = tabla.querySelector("tbody");
+
+      for (const usuario of usuarios) {
+        const fila = document.createElement("tr");
+
+        const ultimoLogin = usuario.ultimo_login
+          ? new Date(usuario.ultimo_login).toLocaleString("es-AR")
+          : "Nunca";
+
+        fila.innerHTML = `
+          <td>${usuario.nombre_usuario}</td>
+          <td><input type="text" class="input-nombre" value="${usuario.nombre_completo}" /></td>
+          <td>
+            <select class="input-rol">
+              <option value="usuario" ${usuario.rol === "usuario" ? "selected" : ""}>usuario</option>
+              <option value="admin" ${usuario.rol === "admin" ? "selected" : ""}>admin</option>
+            </select>
+          </td>
+          <td><input type="checkbox" class="input-activo" ${usuario.activo ? "checked" : ""} /></td>
+          <td>${ultimoLogin}</td>
+          <td class="acciones-usuario">
+            <button class="btn-chico btn-guardar">Guardar</button>
+            <button class="btn-chico btn-clave">Cambiar clave</button>
+          </td>
+        `;
+
+        fila.querySelector(".btn-guardar").addEventListener("click", () => guardarUsuario(usuario.id, fila));
+        fila.querySelector(".btn-clave").addEventListener("click", () => cambiarClave(usuario.id));
+
+        tbody.appendChild(fila);
+      }
+
+      contenedor.appendChild(tabla);
+    }
+
+    async function guardarUsuario(id, fila) {
+      const nombreCompleto = fila.querySelector(".input-nombre").value.trim();
+      const rol = fila.querySelector(".input-rol").value;
+      const activo = fila.querySelector(".input-activo").checked;
+
+      const respuesta = await fetch(`/api/usuarios/${id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombreCompleto, rol, activo }),
+      });
+      const datos = await respuesta.json();
+
+      if (!respuesta.ok) {
+        alert(datos.error || "No se pudo guardar");
+        return;
+      }
+      cargarUsuarios();
+    }
+
+    async function cambiarClave(id) {
+      const nuevaClave = prompt("Nueva contraseña para este usuario:");
+      if (!nuevaClave) return;
+
+      const respuesta = await fetch(`/api/usuarios/${id}/password`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: nuevaClave }),
+      });
+      const datos = await respuesta.json();
+
+      if (!respuesta.ok) {
+        alert(datos.error || "No se pudo cambiar la contraseña");
+        return;
+      }
+      alert("Contraseña actualizada.");
+    }
+
+    document.getElementById("formCrear").addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      const errorCrear = document.getElementById("errorCrear");
+      errorCrear.textContent = "";
+
+      const nombreUsuario = document.getElementById("nuevoUsuario").value.trim();
+      const nombreCompleto = document.getElementById("nuevoNombre").value.trim();
+      const password = document.getElementById("nuevoPassword").value;
+      const rol = document.getElementById("nuevoRol").value;
+
+      const respuesta = await fetch("/api/usuarios", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombreUsuario, nombreCompleto, password, rol }),
+      });
+      const datos = await respuesta.json();
+
+      if (!respuesta.ok) {
+        errorCrear.textContent = datos.error || "No se pudo crear el usuario";
+        return;
+      }
+
+      document.getElementById("formCrear").reset();
+      cargarUsuarios();
+    });
+
+    cargarUsuarios();
+  </script>
+</body>
+</html>
