@@ -14,7 +14,7 @@ router.get("/modulos", async (req, res) => {
       FROM app_modulos m
       LEFT JOIN app_preguntas p ON p.modulo_id = m.id AND p.activo = 1
       WHERE m.activo = 1
-      ORDER BY m.orden, m.nombre, p.orden, p.pregunta
+      ORDER BY m.nombre, p.pregunta
     `);
 
     // Agrupamos las filas planas (join) en la estructura anidada que

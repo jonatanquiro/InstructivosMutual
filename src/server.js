@@ -6,6 +6,8 @@ const session = require("express-session");
 const { requiereLogin, requiereAdmin } = require("./middleware/auth");
 const authRoutes = require("./routes/auth.routes");
 const faqRoutes = require("./routes/faq.routes");
+const faqAdminRoutes = require("./routes/faq-admin.routes");
+const estadisticasRoutes = require("./routes/estadisticas.routes");
 const cumpleaniosRoutes = require("./routes/cumpleanios.routes");
 const usuariosRoutes = require("./routes/usuarios.routes");
 const configRoutes = require("./routes/config.routes");
@@ -30,12 +32,23 @@ app.use("/api/auth", authRoutes);
 app.use("/api", requiereLogin, faqRoutes);
 app.use("/api", requiereLogin, cumpleaniosRoutes);
 app.use("/api", requiereLogin, requiereAdmin, usuariosRoutes);
+app.use("/api", requiereLogin, requiereAdmin, faqAdminRoutes);
 app.use("/api", requiereLogin, configRoutes);
+app.use("/api", requiereLogin, requiereAdmin, estadisticasRoutes);
 
-// usuarios.html es solo para admins. Se define ANTES del static middleware
-// para interceptar el pedido y no dejar que se sirva el archivo sin control.
+// usuarios.html, faq-admin.html y proyectos.html son solo para admins. Se
+// definen ANTES del static middleware para interceptar el pedido y no
+// dejar que se sirva el archivo sin control.
 app.get("/usuarios.html", requiereLogin, requiereAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "usuarios.html"));
+});
+
+app.get("/faq-admin.html", requiereLogin, requiereAdmin, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "faq-admin.html"));
+});
+
+app.get("/proyectos.html", requiereLogin, requiereAdmin, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "proyectos.html"));
 });
 
 // Archivos estáticos (HTML/CSS/JS del frontend). "index: false" es clave:

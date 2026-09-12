@@ -22,9 +22,8 @@
     </div>
   </header>
 
-  <main>
-    <input type="text" class="buscador" id="buscador" placeholder="Buscar pregunta..." />
-    <div id="listaModulos">Cargando...</div>
+  <main class="main-chat">
+    <div class="chat-caja" id="chatCaja"></div>
   </main>
 
   <footer class="barra-inferior">
@@ -35,73 +34,116 @@
   <script src="/comun.js"></script>
   <script>
     let modulos = [];
+    let nombreUsuario = "";
+    const chatCaja = document.getElementById("chatCaja");
 
-    async function cargarModulos() {
-      const respuesta = await fetch("/api/modulos");
-      if (respuesta.status === 401) {
-        window.location.href = "/login.html";
-        return;
-      }
-      modulos = await respuesta.json();
-      modulos.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
-      pintarModulos(modulos);
+    function scrollAbajo() {
+      chatCaja.scrollTop = chatCaja.scrollHeight;
     }
 
-    function pintarModulos(listaModulos, abiertoPorDefecto) {
-      const contenedor = document.getElementById("listaModulos");
-      contenedor.innerHTML = "";
+    // Para respuestas largas, no alcanza con "scroll al fondo": el usuario
+    // tendría que bajar a mano para leerla entera. En su lugar, llevamos el
+    // inicio de la burbuja nueva justo debajo del header, así se lee de
+    // arriba hacia abajo sin gestos extra.
+    function scrollAlInicioDe(elemento) {
+      requestAnimationFrame(() => {
+        elemento.scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    }
 
-      const modulosConPreguntas = listaModulos.filter((m) => m.preguntas.length > 0);
+    function agregarBurbuja(texto, tipo, llevarVistaAlInicio) {
+      const burbuja = document.createElement("div");
+      burbuja.className = `burbuja burbuja-${tipo}`;
+      burbuja.style.whiteSpace = "pre-wrap";
+      burbuja.textContent = texto;
+      chatCaja.appendChild(burbuja);
+
+      if (llevarVistaAlInicio) {
+        scrollAlInicioDe(burbuja);
+      } else {
+        scrollAbajo();
+      }
+
+      return burbuja;
+    }
+
+    function agregarOpciones(opciones, onElegir) {
+      const contenedor = document.createElement("div");
+      contenedor.className = "burbuja-opciones";
+
+      for (const opcion of opciones) {
+        const boton = document.createElement("button");
+        boton.className = "btn-opcion-chat";
+        boton.textContent = opcion.etiqueta;
+        boton.addEventListener("click", () => {
+          // Una vez elegida una opción, se deshabilitan todas: no queremos
+          // que se puedan re-elegir opciones de un paso ya pasado.
+          contenedor.querySelectorAll("button").forEach((b) => (b.disabled = true));
+          contenedor.classList.add("opciones-usadas");
+          onElegir(opcion);
+        });
+        contenedor.appendChild(boton);
+      }
+
+      chatCaja.appendChild(contenedor);
+      scrollAbajo();
+    }
+
+    function mostrarModulos() {
+      agregarBurbuja("¿Sobre qué módulo te gustaría hacer la consulta?", "bot");
+
+      const modulosConPreguntas = modulos.filter((m) => m.preguntas.length > 0);
 
       if (modulosConPreguntas.length === 0) {
-        contenedor.innerHTML = '<div class="sin-resultados">No se encontraron preguntas.</div>';
+        agregarBurbuja("Todavía no hay preguntas cargadas.", "bot");
         return;
       }
 
-      for (const modulo of modulosConPreguntas) {
-        const divModulo = document.createElement("div");
-        divModulo.className = "modulo";
+      agregarOpciones(
+        modulosConPreguntas.map((m) => ({ etiqueta: m.nombre, modulo: m })),
+        (opcion) => {
+          agregarBurbuja(opcion.etiqueta, "usuario");
+          mostrarPreguntas(opcion.modulo);
+        }
+      );
+    }
 
-        const tituloModulo = document.createElement("div");
-        tituloModulo.className = "modulo-titulo";
-        tituloModulo.textContent = modulo.nombre;
+    function mostrarPreguntas(modulo) {
+      agregarBurbuja(`Estas son las preguntas de "${modulo.nombre}":`, "bot", true);
 
-        const divPreguntas = document.createElement("div");
-        divPreguntas.className = abiertoPorDefecto ? "modulo-preguntas abierto" : "modulo-preguntas";
+      const opciones = modulo.preguntas.map((p) => ({ etiqueta: p.pregunta, pregunta: p }));
+      opciones.push({ etiqueta: "◂ Volver a módulos", volver: true });
 
-        for (const pregunta of modulo.preguntas) {
-          const divPregunta = document.createElement("div");
-          divPregunta.className = "pregunta";
-
-          const tituloPregunta = document.createElement("div");
-          tituloPregunta.className = "pregunta-titulo";
-          tituloPregunta.textContent = "▸ " + pregunta.pregunta;
-
-          const divRespuesta = document.createElement("div");
-          divRespuesta.className = "pregunta-respuesta";
-          divRespuesta.textContent = pregunta.respuesta;
-
-          tituloPregunta.addEventListener("click", () => {
-            const seEstabaAbriendo = !divRespuesta.classList.contains("abierto");
-            divRespuesta.classList.toggle("abierto");
-            if (seEstabaAbriendo) {
-              registrarConsulta(pregunta.id);
-            }
-          });
-
-          divPregunta.appendChild(tituloPregunta);
-          divPregunta.appendChild(divRespuesta);
-          divPreguntas.appendChild(divPregunta);
+      agregarOpciones(opciones, (opcion) => {
+        if (opcion.volver) {
+          agregarBurbuja("Volver a módulos", "usuario");
+          mostrarModulos();
+          return;
         }
 
-        tituloModulo.addEventListener("click", () => {
-          divPreguntas.classList.toggle("abierto");
-        });
+        agregarBurbuja(opcion.etiqueta, "usuario");
+        agregarBurbuja(opcion.pregunta.respuesta, "bot", true);
+        registrarConsulta(opcion.pregunta.id);
+        mostrarSeguirModulo(modulo);
+      });
+    }
 
-        divModulo.appendChild(tituloModulo);
-        divModulo.appendChild(divPreguntas);
-        contenedor.appendChild(divModulo);
-      }
+    function mostrarSeguirModulo(modulo) {
+      agregarOpciones(
+        [
+          { etiqueta: `Ver otra pregunta de "${modulo.nombre}"`, seguir: true },
+          { etiqueta: "◂ Volver a módulos", volver: true },
+        ],
+        (opcion) => {
+          if (opcion.volver) {
+            agregarBurbuja("Volver a módulos", "usuario");
+            mostrarModulos();
+            return;
+          }
+          agregarBurbuja(opcion.etiqueta, "usuario");
+          mostrarPreguntas(modulo);
+        }
+      );
     }
 
     function registrarConsulta(preguntaId) {
@@ -109,22 +151,30 @@
       fetch(`/api/preguntas/${preguntaId}/consulta`, { method: "POST" }).catch(() => {});
     }
 
-    document.getElementById("buscador").addEventListener("input", (evento) => {
-      const texto = evento.target.value.trim().toLowerCase();
-
-      if (texto.length === 0) {
-        pintarModulos(modulos);
-        return;
+    async function iniciar() {
+      try {
+        const meRespuesta = await fetch("/api/auth/me");
+        if (meRespuesta.ok) {
+          const me = await meRespuesta.json();
+          nombreUsuario = me.nombreCompleto || "";
+        }
+      } catch (error) {
+        // Si falla, seguimos sin nombre.
       }
 
-      const filtrados = modulos.map((modulo) => ({
-        ...modulo,
-        preguntas: modulo.preguntas.filter((p) => p.pregunta.toLowerCase().includes(texto)),
-      }));
-      pintarModulos(filtrados, true);
-    });
+      const respuesta = await fetch("/api/modulos");
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      modulos = await respuesta.json();
+      modulos.sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
 
-    cargarModulos();
+      agregarBurbuja(`Hola${nombreUsuario ? ", " + nombreUsuario : ""}.`, "bot");
+      mostrarModulos();
+    }
+
+    iniciar();
   </script>
 </body>
 </html>

@@ -48,11 +48,11 @@
         <span class="tarjeta-desc">autogestion.mutualclubunion.com.ar</span>
       </a>
 
-      <div class="tarjeta-menu tarjeta-proximamente">
+      <a class="tarjeta-menu" href="/proyectos.html" id="tarjetaProyectos" hidden>
         <span class="tarjeta-icono">📊</span>
         <span class="tarjeta-titulo">Proyectos</span>
-        <span class="tarjeta-desc">Próximamente</span>
-      </div>
+        <span class="tarjeta-desc">Estadísticas de la mutual</span>
+      </a>
 
       <div class="tarjeta-menu tarjeta-cumple">
         <span class="tarjeta-icono">🎂</span>
@@ -71,6 +71,12 @@
         <span class="tarjeta-titulo">Usuarios</span>
         <span class="tarjeta-desc">Crear y administrar usuarios</span>
       </a>
+
+      <a class="tarjeta-menu" href="/faq-admin.html" id="tarjetaFaqAdmin" hidden>
+        <span class="tarjeta-icono">🛠️</span>
+        <span class="tarjeta-titulo">Administrar Preguntas</span>
+        <span class="tarjeta-desc">Módulos, preguntas y estadísticas</span>
+      </a>
     </div>
   </main>
 
@@ -86,6 +92,8 @@
         const datos = await respuesta.json();
         if (datos.rol === "admin") {
           document.getElementById("tarjetaUsuarios").hidden = false;
+          document.getElementById("tarjetaFaqAdmin").hidden = false;
+          document.getElementById("tarjetaProyectos").hidden = false;
         }
       } catch (error) {
         // Si falla, simplemente no mostramos la tarjeta.

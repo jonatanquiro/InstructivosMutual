@@ -1,0 +1,1457 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Proyectos — Información Mutual</title>
+  <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
+  <script>
+    (function () {
+      var t = localStorage.getItem("tema");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/4.2.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/5.0.8/jspdf.plugin.autotable.min.js"></script>
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-izq">
+      <img src="/img/logo-blanco.png" alt="Logo Mutual" class="logo-barra" />
+      <h1 id="tituloModulo">Proyectos — Estadísticas</h1>
+      <span class="saludo" id="saludo"></span>
+    </div>
+  </header>
+
+  <main class="main-proyectos">
+    <!-- Menú de módulos -->
+    <div id="vistaMenu">
+      <div class="grilla-menu grilla-menu-proyectos" id="grillaModulos"></div>
+    </div>
+
+    <!-- Vista de un módulo -->
+    <div id="vistaModulo" hidden>
+      <div class="barra-acciones-modulo">
+        <button class="btn-volver-modulos" id="btnVolverModulos">◂ Todos los módulos</button>
+        <div class="acciones-modulo-derecha">
+          <button class="btn-presentacion" id="btnExportarPdf">📄 Exportar PDF</button>
+          <button class="btn-presentacion" id="btnPresentacion">🖥️ Modo Presentación</button>
+        </div>
+      </div>
+
+      <div class="filtros-proyectos">
+        <div class="filtro-sucursales" id="filtroSucursales"></div>
+
+        <div class="atajos-fecha" id="atajosFecha">
+          <button type="button" data-atajo="trimestre">Último trimestre</button>
+          <button type="button" data-atajo="anio-actual">Año en curso</button>
+          <button type="button" data-atajo="ultimos-12">Últimos 12 meses</button>
+          <button type="button" data-atajo="todo">Todo el histórico</button>
+        </div>
+
+        <label for="filtroDesde">Desde</label>
+        <select id="filtroDesde"></select>
+
+        <label for="filtroHasta">Hasta</label>
+        <select id="filtroHasta"></select>
+      </div>
+
+      <section id="panel-socios" class="panel-modulo" hidden>
+        <h3 class="titulo-seccion">Socios</h3>
+        <div class="grilla-resumen" id="kpiSocios"></div>
+
+        <div class="grilla-2col">
+          <div class="caja-grafico">
+            <h2>Altas por sucursal</h2>
+            <canvas id="graficoSociosAltas"></canvas>
+          </div>
+          <div class="caja-grafico">
+            <h2>Bajas por sucursal</h2>
+            <canvas id="graficoSociosBajas"></canvas>
+          </div>
+        </div>
+        <div class="tabla-detalle" id="tablaSocios"></div>
+
+        <h3 class="titulo-seccion">Cuotas Sociales</h3>
+        <div class="grilla-resumen" id="kpiCuotas"></div>
+
+        <div class="caja-grafico">
+          <h2>Cuotas cobradas por mes</h2>
+          <canvas id="graficoCuotasCantidad"></canvas>
+        </div>
+        <div class="tabla-detalle" id="tablaCuotas"></div>
+      </section>
+
+      <section id="panel-ayudas" class="panel-modulo" hidden>
+        <h3 class="titulo-seccion">Ayudas Económicas</h3>
+        <div class="grilla-resumen" id="kpiPrestamos"></div>
+
+        <div class="grilla-2col">
+          <div class="caja-grafico">
+            <h2>Préstamos otorgados por sucursal</h2>
+            <canvas id="graficoPrestamosCantidad"></canvas>
+          </div>
+          <div class="caja-grafico">
+            <h2>Importe otorgado por sucursal</h2>
+            <canvas id="graficoPrestamosImporte"></canvas>
+          </div>
+        </div>
+        <div class="tabla-detalle" id="tablaPrestamos"></div>
+      </section>
+
+      <section id="panel-plazo-fijo" class="panel-modulo" hidden>
+        <h3 class="titulo-seccion">Plazo Fijo</h3>
+        <div class="grilla-resumen" id="kpiPlazoFijo"></div>
+
+        <div class="grilla-2col">
+          <div class="caja-grafico">
+            <h2>Cantidad de plazos fijos por sucursal</h2>
+            <canvas id="graficoPlazoFijoCantidad"></canvas>
+          </div>
+          <div class="caja-grafico">
+            <h2>Importe colocado por sucursal</h2>
+            <canvas id="graficoPlazoFijoImporte"></canvas>
+          </div>
+        </div>
+        <div class="tabla-detalle" id="tablaPlazoFijo"></div>
+      </section>
+
+      <section id="panel-tarjetas" class="panel-modulo" hidden>
+        <h3 class="titulo-seccion">TMU / Tarjeta +Unión</h3>
+        <div class="grilla-resumen" id="kpiTarjetas"></div>
+
+        <div class="grilla-2col">
+          <div class="caja-grafico">
+            <h2>Usuarios por sucursal</h2>
+            <canvas id="graficoTarjetasUsuarios"></canvas>
+          </div>
+          <div class="caja-grafico">
+            <h2>Usuarios con consumo por sucursal</h2>
+            <canvas id="graficoTarjetasConsumos"></canvas>
+          </div>
+        </div>
+
+        <div class="grilla-2col">
+          <div class="caja-grafico">
+            <h2>Consumo total por sucursal</h2>
+            <canvas id="graficoTarjetasTotalConsumo"></canvas>
+          </div>
+          <div class="caja-grafico">
+            <h2>Total pagado por sucursal</h2>
+            <canvas id="graficoTarjetasTotalPago"></canvas>
+          </div>
+        </div>
+        <div class="tabla-detalle" id="tablaTarjetas"></div>
+      </section>
+
+      <section id="panel-comercios" class="panel-modulo" hidden>
+        <h3 class="titulo-seccion">Comercios</h3>
+        <p class="nota-grafico">Este dato es global de la mutual, no está dividido por sucursal.</p>
+        <div class="grilla-resumen" id="kpiComercios"></div>
+
+        <div class="caja-grafico">
+          <h2>Comercios adheridos y con consumo</h2>
+          <canvas id="graficoComerciosCantidad"></canvas>
+        </div>
+
+        <div class="caja-grafico">
+          <h2>Consumo total</h2>
+          <canvas id="graficoComerciosConsumo"></canvas>
+        </div>
+      </section>
+
+      <section id="panel-home-mutual" class="panel-modulo" hidden>
+        <h3 class="titulo-seccion">Home Mutual</h3>
+        <p class="nota-grafico">Este dato es global de la mutual, no está dividido por sucursal.</p>
+        <div class="grilla-resumen" id="kpiHomeMutual"></div>
+
+        <div class="caja-grafico">
+          <h2>Consultas totales por mes</h2>
+          <canvas id="graficoHomeMutualTendencia"></canvas>
+        </div>
+
+        <div class="caja-grafico">
+          <h2>Ranking por tipo de consulta (período)</h2>
+          <canvas id="graficoHomeMutualRanking"></canvas>
+        </div>
+        <div class="tabla-detalle" id="tablaHomeMutual"></div>
+      </section>
+
+      <section id="panel-optica" class="panel-modulo" hidden>
+        <h3 class="titulo-seccion">Óptica</h3>
+        <div class="grilla-resumen" id="kpiOptica"></div>
+
+        <div class="grilla-2col">
+          <div class="caja-grafico">
+            <h2>Cantidad por sucursal</h2>
+            <canvas id="graficoOpticaCantidad"></canvas>
+          </div>
+          <div class="caja-grafico">
+            <h2>Importe total por sucursal</h2>
+            <canvas id="graficoOpticaTotal"></canvas>
+          </div>
+        </div>
+        <div class="tabla-detalle" id="tablaOptica"></div>
+      </section>
+
+      <section id="panel-tramites" class="panel-modulo" hidden>
+        <h3 class="titulo-seccion">Trámites</h3>
+        <p class="nota-grafico">La sucursal es la de origen del trámite (existe también sucursal de destino, todavía no se muestra).</p>
+        <div class="grilla-resumen" id="kpiTramites"></div>
+
+        <div class="grilla-2col">
+          <div class="caja-grafico">
+            <h2>Cantidad por sucursal</h2>
+            <canvas id="graficoTramitesCantidad"></canvas>
+          </div>
+          <div class="caja-grafico">
+            <h2>Importe total por sucursal</h2>
+            <canvas id="graficoTramitesTotal"></canvas>
+          </div>
+        </div>
+        <div class="tabla-detalle" id="tablaTramites"></div>
+      </section>
+
+      <section id="panel-practicas" class="panel-modulo" hidden>
+        <h3 class="titulo-seccion">Prácticas</h3>
+        <div class="grilla-resumen" id="kpiPracticas"></div>
+
+        <div class="grilla-2col">
+          <div class="caja-grafico">
+            <h2>Cantidad por sucursal</h2>
+            <canvas id="graficoPracticasCantidad"></canvas>
+          </div>
+          <div class="caja-grafico">
+            <h2>Importe total por sucursal</h2>
+            <canvas id="graficoPracticasTotal"></canvas>
+          </div>
+        </div>
+        <div class="tabla-detalle" id="tablaPracticas"></div>
+
+        <h3 class="titulo-seccion">Por profesión y profesional</h3>
+        <div class="grilla-2col">
+          <div class="caja-grafico">
+            <h2>Por profesión</h2>
+            <canvas id="graficoPracticasProfesion"></canvas>
+          </div>
+          <div class="caja-grafico">
+            <h2>Ranking de profesionales (período)</h2>
+            <canvas id="graficoPracticasProfesional"></canvas>
+          </div>
+        </div>
+        <div class="tabla-detalle" id="tablaPracticasProfesionales"></div>
+      </section>
+
+      <section id="panel-panteones" class="panel-modulo" hidden>
+        <h3 class="titulo-seccion">Panteones</h3>
+        <p class="nota-grafico">Este dato es global de la mutual, no está dividido por sucursal.</p>
+        <div class="grilla-resumen" id="kpiPanteones"></div>
+
+        <div class="caja-grafico">
+          <h2>Cantidad total por mes</h2>
+          <canvas id="graficoPanteonesTendencia"></canvas>
+        </div>
+
+        <div class="grilla-2col">
+          <div class="caja-grafico">
+            <h2>Por tipo</h2>
+            <canvas id="graficoPanteonesTipo"></canvas>
+          </div>
+          <div class="caja-grafico">
+            <h2>Por forma de pago</h2>
+            <canvas id="graficoPanteonesFormaPago"></canvas>
+          </div>
+        </div>
+        <div class="tabla-detalle" id="tablaPanteones"></div>
+      </section>
+
+      <section id="panel-proximamente" class="panel-modulo" hidden>
+        <div class="sin-resultados">Este módulo todavía no tiene datos conectados. Próximamente.</div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="barra-inferior">
+    <a href="/" class="btn-inferior principal">⌂ Menú principal</a>
+    <button id="btnSalir" class="btn-inferior peligro">Cerrar sesión</button>
+  </footer>
+
+  <button id="btnSalirPresentacion" class="btn-salir-presentacion" hidden>✕ Salir de presentación</button>
+
+  <script src="/comun.js"></script>
+  <script>
+    // Módulos disponibles, tomados del tablero dinámico de la mutual.
+    // "implementado" marca cuáles ya tienen datos reales conectados;
+    // el resto muestra el panel "Próximamente".
+    const MODULOS = [
+      { id: "socios", nombre: "Socios", desc: "Cartera de socios y cuotas sociales", icono: "👥", implementado: true },
+      { id: "ayudas", nombre: "Ayudas Económicas", desc: "Préstamos otorgados", icono: "💰", implementado: true },
+      { id: "plazo-fijo", nombre: "Plazo Fijo", desc: "Colocaciones a plazo fijo", icono: "🏦", implementado: true },
+      { id: "tarjetas", nombre: "TMU / Tarjeta +Unión", desc: "Usuarios y consumos", icono: "💳", implementado: true },
+      { id: "comercios", nombre: "Comercios", desc: "Comercios adheridos", icono: "🏬", implementado: true, porSucursal: false },
+      { id: "home-mutual", nombre: "Home Mutual", desc: "Uso de Home Mutual", icono: "🏠", implementado: true, porSucursal: false },
+      { id: "tramites", nombre: "Trámites", desc: "Gestiones y trámites", icono: "📋", implementado: true },
+      { id: "optica", nombre: "Óptica", desc: "Prestaciones de óptica", icono: "👓", implementado: true },
+      { id: "practicas", nombre: "Prácticas", desc: "Prácticas médicas", icono: "🩺", implementado: true },
+      { id: "panteones", nombre: "Panteones", desc: "Gestión de panteones", icono: "⛲", implementado: true, porSucursal: false },
+    ];
+
+    let graficos = {};
+    let moduloActivo = null;
+    let sucursales = []; // [{id, nombre, color}]
+
+    // Cache de lo último traído del servidor por módulo, para poder
+    // redibujar al tildar/destildar sucursales sin volver a pedir datos.
+    const datosCrudos = {
+      socios: null,
+      cuotas: null,
+      prestamos: null,
+      plazoFijo: null,
+      tarjetas: null,
+      comercios: null,
+      homeMutual: null,
+      optica: null,
+      tramites: null,
+      practicas: null,
+      panteones: null,
+      practicasPorProfesion: null,
+      practicasPorProfesional: null,
+    };
+
+    const NOMBRES_MES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+    let MES_INICIO = 202004;
+    let MES_FIN = 202004;
+
+    function listaDeMeses() {
+      const meses = [];
+      let anio = Math.floor(MES_INICIO / 100);
+      let mes = MES_INICIO % 100;
+
+      while (anio * 100 + mes <= MES_FIN) {
+        meses.push(anio * 100 + mes);
+        mes++;
+        if (mes > 12) {
+          mes = 1;
+          anio++;
+        }
+      }
+      return meses;
+    }
+
+    function etiquetaMes(idtiempo) {
+      const texto = String(idtiempo);
+      const anio = texto.slice(0, 4);
+      const mes = Number(texto.slice(4, 6));
+      return `${NOMBRES_MES[mes - 1]} ${anio}`;
+    }
+
+    function formatearNumero(numero) {
+      return Number(numero || 0).toLocaleString("es-AR");
+    }
+
+    function formatearMoneda(numero) {
+      return Number(numero || 0).toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
+    }
+
+    function llenarSelectsDeMeses() {
+      const meses = listaDeMeses();
+      const selectDesde = document.getElementById("filtroDesde");
+      const selectHasta = document.getElementById("filtroHasta");
+
+      const opciones = meses.map((m) => `<option value="${m}">${etiquetaMes(m)}</option>`).join("");
+      selectDesde.innerHTML = opciones;
+      selectHasta.innerHTML = opciones;
+
+      // Por defecto mostramos solo el último mes cargado y el anterior; el
+      // usuario puede agrandar el rango si quiere ver más historia.
+      selectDesde.value = meses[Math.max(meses.length - 2, 0)];
+      selectHasta.value = meses[meses.length - 1];
+    }
+
+    // --- Menú de módulos ---
+
+    function pintarMenuModulos() {
+      const grilla = document.getElementById("grillaModulos");
+      grilla.innerHTML = "";
+
+      for (const modulo of MODULOS) {
+        const tarjeta = document.createElement("button");
+        tarjeta.type = "button";
+        tarjeta.className = "tarjeta-menu tarjeta-modulo-proyecto";
+        tarjeta.innerHTML = `
+          <span class="tarjeta-icono">${modulo.icono}</span>
+          <span class="tarjeta-titulo">${modulo.nombre}</span>
+          <span class="tarjeta-desc">${modulo.desc}</span>
+        `;
+        tarjeta.addEventListener("click", () => abrirModulo(modulo));
+        grilla.appendChild(tarjeta);
+      }
+    }
+
+    function abrirModulo(modulo) {
+      moduloActivo = modulo;
+      document.getElementById("tituloModulo").textContent = `Proyectos — ${modulo.nombre}`;
+      document.getElementById("vistaMenu").hidden = true;
+      document.getElementById("vistaModulo").hidden = false;
+
+      document.querySelectorAll(".panel-modulo").forEach((p) => (p.hidden = true));
+
+      // Comercios (y cualquier módulo futuro sin idsucursal) no usa el
+      // filtro de sucursales: no tiene sentido tildar/destildar algo que
+      // no existe en esos datos.
+      document.getElementById("filtroSucursales").style.display = modulo.porSucursal === false ? "none" : "";
+
+      if (modulo.implementado) {
+        document.getElementById(`panel-${modulo.id}`).hidden = false;
+        cargarDatosModulo(modulo.id);
+      } else {
+        document.getElementById("panel-proximamente").hidden = false;
+      }
+    }
+
+    document.getElementById("btnVolverModulos").addEventListener("click", () => {
+      document.getElementById("tituloModulo").textContent = "Proyectos — Estadísticas";
+      document.getElementById("vistaModulo").hidden = true;
+      document.getElementById("vistaMenu").hidden = false;
+      moduloActivo = null;
+      salirModoPresentacion();
+    });
+
+    // --- Modo Presentación ---
+    // Pensado para mostrar en la reunión de comisión directiva: pantalla
+    // limpia, sin controles de admin, letra más grande. Se activa/desactiva
+    // con un botón, no hace falta navegar a ningún lado especial.
+
+    function activarModoPresentacion() {
+      document.body.classList.add("modo-presentacion");
+      document.getElementById("btnSalirPresentacion").hidden = false;
+      if (document.documentElement.requestFullscreen) {
+        document.documentElement.requestFullscreen().catch(() => {});
+      }
+    }
+
+    function salirModoPresentacion() {
+      document.body.classList.remove("modo-presentacion");
+      document.getElementById("btnSalirPresentacion").hidden = true;
+      if (document.fullscreenElement) {
+        document.exitFullscreen().catch(() => {});
+      }
+    }
+
+    document.getElementById("btnPresentacion").addEventListener("click", activarModoPresentacion);
+    document.getElementById("btnSalirPresentacion").addEventListener("click", salirModoPresentacion);
+
+    // Si el usuario sale de pantalla completa con Esc, salimos también del
+    // modo presentación (si no, queda la letra grande sin el fullscreen).
+    document.addEventListener("fullscreenchange", () => {
+      if (!document.fullscreenElement && document.body.classList.contains("modo-presentacion")) {
+        salirModoPresentacion();
+      }
+    });
+
+    // --- Exportar a PDF ---
+    // Arma un PDF con lo que se está viendo del módulo activo en ese
+    // momento: KPIs, cada gráfico como imagen, y cada tabla de detalle.
+    // Así alguien que estuvo en la reunión se puede llevar justo lo que se
+    // mostró, con el mismo período y sucursales que se eligieron ahí.
+
+    async function exportarPdf() {
+      if (!moduloActivo) return;
+
+      const { jsPDF } = window.jspdf;
+      const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+      const anchoPagina = doc.internal.pageSize.getWidth();
+      const altoPagina = doc.internal.pageSize.getHeight();
+      let y = 15;
+
+      function saltarPaginaSiHaceFalta(alturaNecesaria) {
+        if (y + alturaNecesaria > altoPagina - 15) {
+          doc.addPage();
+          y = 15;
+        }
+      }
+
+      doc.setFontSize(16);
+      doc.text(`Proyectos — ${moduloActivo.nombre}`, 15, y);
+      y += 8;
+
+      doc.setFontSize(10);
+      doc.setTextColor(90);
+      const desdeTexto = etiquetaMes(Number(document.getElementById("filtroDesde").value));
+      const hastaTexto = etiquetaMes(Number(document.getElementById("filtroHasta").value));
+      doc.text(`Período: ${desdeTexto} a ${hastaTexto}`, 15, y);
+      y += 5;
+
+      if (moduloActivo.porSucursal !== false) {
+        const nombresSucursales = sucursalesSeleccionadas().map(nombreDeSucursal).join(", ");
+        doc.text(`Sucursales: ${nombresSucursales}`, 15, y);
+        y += 5;
+      }
+
+      doc.text(`Generado el ${new Date().toLocaleString("es-AR")}`, 15, y);
+      doc.setTextColor(0);
+      y += 10;
+
+      const panel = document.getElementById(`panel-${moduloActivo.id}`);
+
+      // KPIs, como una lista simple de "etiqueta: valor".
+      const kpis = panel.querySelectorAll(".tarjeta-stat");
+      if (kpis.length) {
+        doc.setFontSize(11);
+        kpis.forEach((kpi) => {
+          const valor = kpi.querySelector("strong").textContent;
+          const etiqueta = kpi.querySelector("span").textContent;
+          saltarPaginaSiHaceFalta(6);
+          doc.text(`${etiqueta}: ${valor}`, 15, y);
+          y += 6;
+        });
+        y += 4;
+      }
+
+      // Cada gráfico visible, como imagen (Chart.js ya lo expone así).
+      const canvases = panel.querySelectorAll("canvas");
+      const anchoImagen = anchoPagina - 30;
+      const altoImagen = 75;
+
+      for (const canvas of canvases) {
+        const grafico = graficos[canvas.id];
+        if (!grafico) continue;
+
+        const tituloGrafico = canvas.closest(".caja-grafico")?.querySelector("h2")?.textContent || "";
+        saltarPaginaSiHaceFalta(altoImagen + 12);
+
+        doc.setFontSize(12);
+        doc.text(tituloGrafico, 15, y);
+        y += 5;
+        doc.addImage(grafico.toBase64Image(), "PNG", 15, y, anchoImagen, altoImagen);
+        y += altoImagen + 8;
+      }
+
+      // Cada tabla de detalle, tal cual se ve en pantalla.
+      const tablas = panel.querySelectorAll(".tabla-detalle table");
+      tablas.forEach((tablaEl) => {
+        saltarPaginaSiHaceFalta(20);
+        doc.autoTable({ html: tablaEl, startY: y, styles: { fontSize: 8 }, margin: { left: 15, right: 15 } });
+        y = doc.lastAutoTable.finalY + 8;
+      });
+
+      const nombreArchivo = `proyectos-${moduloActivo.id}-${desdeTexto}-a-${hastaTexto}.pdf`.replace(/\s+/g, "-");
+      doc.save(nombreArchivo);
+    }
+
+    document.getElementById("btnExportarPdf").addEventListener("click", () => {
+      exportarPdf().catch((error) => {
+        console.error("Error exportando PDF:", error);
+        alert("No se pudo generar el PDF. Probá de nuevo.");
+      });
+    });
+
+    // --- Atajos de fecha ---
+    // Todo se calcula en base a MES_FIN (el último mes con datos reales
+    // cargados), no la fecha calendario de hoy.
+
+    function sumarMeses(idtiempo, cantidad) {
+      let anio = Math.floor(idtiempo / 100);
+      let mes = (idtiempo % 100) + cantidad;
+      while (mes > 12) {
+        mes -= 12;
+        anio++;
+      }
+      while (mes < 1) {
+        mes += 12;
+        anio--;
+      }
+      return anio * 100 + mes;
+    }
+
+    function aplicarAtajoFecha(atajo) {
+      let desde;
+      let hasta = MES_FIN;
+
+      if (atajo === "trimestre") {
+        desde = Math.max(sumarMeses(MES_FIN, -2), MES_INICIO);
+      } else if (atajo === "anio-actual") {
+        desde = Math.max(Math.floor(MES_FIN / 100) * 100 + 1, MES_INICIO);
+      } else if (atajo === "ultimos-12") {
+        desde = Math.max(sumarMeses(MES_FIN, -11), MES_INICIO);
+      } else {
+        desde = MES_INICIO;
+      }
+
+      document.getElementById("filtroDesde").value = desde;
+      document.getElementById("filtroHasta").value = hasta;
+      if (moduloActivo) cargarDatosModulo(moduloActivo.id);
+    }
+
+    document.getElementById("atajosFecha").addEventListener("click", (evento) => {
+      const boton = evento.target.closest("button[data-atajo]");
+      if (boton) aplicarAtajoFecha(boton.dataset.atajo);
+    });
+
+    // Trae el último mes con datos reales cargados en la DW, para que el
+    // filtro "Hasta" arranque ahí (no en el mes calendario, que puede no
+    // tener carga todavía).
+    async function cargarRangoFechas() {
+      const respuesta = await fetch("/api/estadisticas/rango-fechas");
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      const rango = await respuesta.json();
+      MES_INICIO = rango.desde;
+      MES_FIN = rango.hasta;
+    }
+
+    // --- Filtro de sucursales (checkboxes con color) ---
+
+    async function cargarSucursales() {
+      const respuesta = await fetch("/api/estadisticas/sucursales");
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      sucursales = await respuesta.json();
+
+      const contenedor = document.getElementById("filtroSucursales");
+      contenedor.innerHTML = sucursales
+        .map(
+          (s) => `
+            <label class="chip-sucursal" style="--color-sucursal: ${s.color}">
+              <input type="checkbox" value="${s.id}" checked />
+              <span class="chip-punto"></span>
+              ${s.nombre}
+            </label>
+          `
+        )
+        .join("");
+
+      contenedor.querySelectorAll("input[type=checkbox]").forEach((casilla) => {
+        casilla.addEventListener("change", () => {
+          if (moduloActivo) redibujarModulo(moduloActivo.id);
+        });
+      });
+    }
+
+    function sucursalesSeleccionadas() {
+      return Array.from(document.querySelectorAll("#filtroSucursales input:checked")).map((c) => Number(c.value));
+    }
+
+    function colorDeSucursal(id) {
+      const sucursal = sucursales.find((s) => s.id === id);
+      return sucursal ? sucursal.color : "#999999";
+    }
+
+    function nombreDeSucursal(id) {
+      const sucursal = sucursales.find((s) => s.id === id);
+      return sucursal ? sucursal.nombre : `Sucursal ${id}`;
+    }
+
+    document.getElementById("filtroDesde").addEventListener("change", () => moduloActivo && cargarDatosModulo(moduloActivo.id));
+    document.getElementById("filtroHasta").addEventListener("change", () => moduloActivo && cargarDatosModulo(moduloActivo.id));
+
+    function leerRangoFechas() {
+      const desde = Number(document.getElementById("filtroDesde").value);
+      const hasta = Number(document.getElementById("filtroHasta").value);
+      return { desde, hasta };
+    }
+
+    // Redibuja con lo que ya está en caché (al tildar/destildar sucursales:
+    // no hace falta volver a pedir nada al servidor).
+    function redibujarModulo(idModulo) {
+      if (idModulo === "socios") dibujarSocios();
+      if (idModulo === "ayudas") dibujarPrestamos();
+      if (idModulo === "plazo-fijo") dibujarPlazoFijo();
+      if (idModulo === "tarjetas") dibujarTarjetas();
+      if (idModulo === "comercios") dibujarComercios();
+      if (idModulo === "home-mutual") dibujarHomeMutual();
+      if (idModulo === "optica") dibujarOptica();
+      if (idModulo === "tramites") dibujarTramites();
+      if (idModulo === "practicas") dibujarPracticas();
+      if (idModulo === "panteones") dibujarPanteones();
+    }
+
+    function cargarDatosModulo(idModulo) {
+      if (idModulo === "socios") cargarDatosSocios();
+      if (idModulo === "ayudas") cargarDatosPrestamos();
+      if (idModulo === "plazo-fijo") cargarDatosPlazoFijo();
+      if (idModulo === "tarjetas") cargarDatosTarjetas();
+      if (idModulo === "comercios") cargarDatosComercios();
+      if (idModulo === "home-mutual") cargarDatosHomeMutual();
+      if (idModulo === "optica") cargarDatosOptica();
+      if (idModulo === "tramites") cargarDatosTramites();
+      if (idModulo === "practicas") cargarDatosPracticas();
+      if (idModulo === "panteones") cargarDatosPanteones();
+    }
+
+    // --- Utilidades de gráficos ---
+
+    function colorTexto() {
+      return getComputedStyle(document.documentElement).getPropertyValue("--texto").trim();
+    }
+
+    function colorBorde() {
+      return getComputedStyle(document.documentElement).getPropertyValue("--borde").trim();
+    }
+
+    function opcionesComunes(apilado) {
+      return {
+        responsive: true,
+        interaction: { mode: "index", intersect: false },
+        plugins: { legend: { labels: { color: colorTexto() } } },
+        scales: {
+          x: { stacked: apilado, ticks: { color: colorTexto() }, grid: { color: colorBorde() } },
+          y: { stacked: apilado, ticks: { color: colorTexto() }, grid: { color: colorBorde() }, beginAtZero: true },
+        },
+      };
+    }
+
+    function dibujarGrafico(idCanvas, tipo, etiquetas, datasets, apilado) {
+      const canvas = document.getElementById(idCanvas);
+      if (graficos[idCanvas]) {
+        graficos[idCanvas].destroy();
+      }
+      graficos[idCanvas] = new Chart(canvas, {
+        type: tipo,
+        data: { labels: etiquetas, datasets },
+        options: opcionesComunes(!!apilado),
+      });
+    }
+
+    // Junta filas {idtiempo, idsucursal, ...campo} en un mapa
+    // idtiempo -> idsucursal -> valor, para armar series por sucursal.
+    function agruparPorMesYSucursal(filas, campo) {
+      const mapa = new Map();
+      for (const fila of filas) {
+        if (!mapa.has(fila.idtiempo)) mapa.set(fila.idtiempo, new Map());
+        mapa.get(fila.idtiempo).set(fila.idsucursal, fila[campo]);
+      }
+      return mapa;
+    }
+
+    function mesesUnicos(filas) {
+      return [...new Set(filas.map((f) => f.idtiempo))].sort((a, b) => a - b);
+    }
+
+    function pintarKpis(idContenedor, tarjetas) {
+      document.getElementById(idContenedor).innerHTML = tarjetas
+        .map(
+          (t) => `
+            <div class="tarjeta-stat${t.claseColor ? " " + t.claseColor : ""}">
+              <strong>${t.valor}</strong>
+              <span>${t.etiqueta}</span>
+            </div>
+          `
+        )
+        .join("");
+    }
+
+    function tabla(encabezados, filas) {
+      if (filas.length === 0) return '<div class="sin-resultados">Sin datos para este rango.</div>';
+      return `
+        <table class="tabla-usuarios">
+          <thead><tr>${encabezados.map((e) => `<th>${e}</th>`).join("")}</tr></thead>
+          <tbody>${filas.map((fila) => `<tr>${fila.map((c) => `<td>${c}</td>`).join("")}</tr>`).join("")}</tbody>
+        </table>
+      `;
+    }
+
+    // --- Socios / Cuotas Sociales ---
+
+    async function cargarDatosSocios() {
+      const { desde, hasta } = leerRangoFechas();
+      const query = `desde=${desde}&hasta=${hasta}`;
+
+      const [respSocios, respCuotas] = await Promise.all([
+        fetch(`/api/estadisticas/socios?${query}`),
+        fetch(`/api/estadisticas/cuotas-sociales?${query}`),
+      ]);
+
+      if (respSocios.status === 401 || respCuotas.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+
+      datosCrudos.socios = await respSocios.json();
+      datosCrudos.cuotas = await respCuotas.json();
+      dibujarSocios();
+    }
+
+    function dibujarSocios() {
+      const seleccionadas = sucursalesSeleccionadas();
+
+      const filasAltasBajas = datosCrudos.socios.filter((f) => seleccionadas.includes(f.idsucursal));
+      const meses = mesesUnicos(filasAltasBajas);
+      const etiquetas = meses.map(etiquetaMes);
+      const mapaAltas = agruparPorMesYSucursal(filasAltasBajas, "altas");
+      const mapaBajas = agruparPorMesYSucursal(filasAltasBajas, "bajas");
+
+      // Una línea por sucursal, en un gráfico para Altas y otro para Bajas:
+      // se leen mucho mejor por separado que mezclando todo en barras.
+      const datasetsAltas = seleccionadas.map((idSucursal) => {
+        const color = colorDeSucursal(idSucursal);
+        return {
+          label: nombreDeSucursal(idSucursal),
+          data: meses.map((m) => (mapaAltas.get(m) || new Map()).get(idSucursal) || 0),
+          borderColor: color,
+          backgroundColor: color + "33",
+          tension: 0.25,
+        };
+      });
+      dibujarGrafico("graficoSociosAltas", "line", etiquetas, datasetsAltas);
+
+      const datasetsBajas = seleccionadas.map((idSucursal) => {
+        const color = colorDeSucursal(idSucursal);
+        return {
+          label: nombreDeSucursal(idSucursal),
+          data: meses.map((m) => (mapaBajas.get(m) || new Map()).get(idSucursal) || 0),
+          borderColor: color,
+          backgroundColor: color + "33",
+          tension: 0.25,
+        };
+      });
+      dibujarGrafico("graficoSociosBajas", "line", etiquetas, datasetsBajas);
+
+      // Tabla de detalle + KPIs: totales del período por sucursal.
+      const filasTablaSocios = seleccionadas.map((id) => {
+        const filasSucursal = filasAltasBajas.filter((f) => f.idsucursal === id);
+        const totalAltas = filasSucursal.reduce((acc, f) => acc + f.altas, 0);
+        const totalBajas = filasSucursal.reduce((acc, f) => acc + f.bajas, 0);
+        const ultimaCantidad = filasSucursal.length ? filasSucursal[filasSucursal.length - 1].cantidad : 0;
+        return [nombreDeSucursal(id), formatearNumero(totalAltas), formatearNumero(totalBajas), formatearNumero(ultimaCantidad)];
+      });
+      document.getElementById("tablaSocios").innerHTML = tabla(
+        ["Sucursal", "Altas (período)", "Bajas (período)", "Cantidad actual"],
+        filasTablaSocios
+      );
+
+      const totalAltasGeneral = filasAltasBajas.reduce((acc, f) => acc + f.altas, 0);
+      const totalBajasGeneral = filasAltasBajas.reduce((acc, f) => acc + f.bajas, 0);
+      const saldoNeto = totalAltasGeneral - totalBajasGeneral;
+      const cantidadActual = meses.length
+        ? seleccionadas.reduce((acc, id) => {
+            const filasSucursal = filasAltasBajas.filter((f) => f.idsucursal === id);
+            return acc + (filasSucursal.length ? filasSucursal[filasSucursal.length - 1].cantidad : 0);
+          }, 0)
+        : 0;
+
+      pintarKpis("kpiSocios", [
+        { etiqueta: "Altas del período", valor: formatearNumero(totalAltasGeneral), claseColor: "stat-verde" },
+        { etiqueta: "Bajas del período", valor: formatearNumero(totalBajasGeneral), claseColor: "stat-rojo" },
+        {
+          etiqueta: "Saldo neto",
+          valor: (saldoNeto >= 0 ? "+" : "") + formatearNumero(saldoNeto),
+          claseColor: saldoNeto >= 0 ? "stat-verde" : "stat-rojo",
+        },
+        { etiqueta: "Cantidad actual", valor: formatearNumero(cantidadActual) },
+      ]);
+
+      // Cuotas Sociales cobradas: una línea por sucursal tildada.
+      const filasCuotas = datosCrudos.cuotas.filter((f) => seleccionadas.includes(f.idsucursal));
+      const mesesCuotas = mesesUnicos(filasCuotas);
+      const etiquetasCuotas = mesesCuotas.map(etiquetaMes);
+      const mapaCantidadCuotas = agruparPorMesYSucursal(filasCuotas, "cantidad");
+
+      const datasetsCuotas = seleccionadas.map((idSucursal) => {
+        const color = colorDeSucursal(idSucursal);
+        return {
+          label: nombreDeSucursal(idSucursal),
+          data: mesesCuotas.map((m) => (mapaCantidadCuotas.get(m) || new Map()).get(idSucursal) || 0),
+          borderColor: color,
+          backgroundColor: color + "33",
+          tension: 0.25,
+          fill: false,
+        };
+      });
+      dibujarGrafico("graficoCuotasCantidad", "line", etiquetasCuotas, datasetsCuotas);
+
+      const filasTablaCuotas = seleccionadas.map((id) => {
+        const filasSucursal = filasCuotas.filter((f) => f.idsucursal === id);
+        const totalCuotas = filasSucursal.reduce((acc, f) => acc + f.cantidad, 0);
+        const totalImporte = filasSucursal.reduce((acc, f) => acc + Number(f.importe), 0);
+        return [nombreDeSucursal(id), formatearNumero(totalCuotas), formatearMoneda(totalImporte)];
+      });
+      document.getElementById("tablaCuotas").innerHTML = tabla(
+        ["Sucursal", "Cuotas cobradas (período)", "Importe cobrado (período)"],
+        filasTablaCuotas
+      );
+
+      const totalCuotasGeneral = filasCuotas.reduce((acc, f) => acc + f.cantidad, 0);
+      const totalImporteCuotas = filasCuotas.reduce((acc, f) => acc + Number(f.importe), 0);
+
+      pintarKpis("kpiCuotas", [
+        { etiqueta: "Cuotas cobradas", valor: formatearNumero(totalCuotasGeneral) },
+        { etiqueta: "Importe cobrado", valor: formatearMoneda(totalImporteCuotas) },
+      ]);
+    }
+
+    // --- Ayudas Económicas / Préstamos ---
+
+    async function cargarDatosPrestamos() {
+      const { desde, hasta } = leerRangoFechas();
+      const query = `desde=${desde}&hasta=${hasta}`;
+
+      const respuesta = await fetch(`/api/estadisticas/prestamos?${query}`);
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+
+      datosCrudos.prestamos = await respuesta.json();
+      dibujarPrestamos();
+    }
+
+    function dibujarPrestamos() {
+      const seleccionadas = sucursalesSeleccionadas();
+
+      // Mismo estilo que Socios: una línea por sucursal, un gráfico para
+      // cantidad y otro para importe.
+      const filas = datosCrudos.prestamos.filter((f) => seleccionadas.includes(f.idsucursal));
+      const meses = mesesUnicos(filas);
+      const etiquetas = meses.map(etiquetaMes);
+      const mapaCantidad = agruparPorMesYSucursal(filas, "cantidad");
+      const mapaImporte = agruparPorMesYSucursal(filas, "importe");
+
+      const datasetsCantidad = seleccionadas.map((idSucursal) => {
+        const color = colorDeSucursal(idSucursal);
+        return {
+          label: nombreDeSucursal(idSucursal),
+          data: meses.map((m) => (mapaCantidad.get(m) || new Map()).get(idSucursal) || 0),
+          borderColor: color,
+          backgroundColor: color + "33",
+          tension: 0.25,
+        };
+      });
+      dibujarGrafico("graficoPrestamosCantidad", "line", etiquetas, datasetsCantidad);
+
+      const datasetsImporte = seleccionadas.map((idSucursal) => {
+        const color = colorDeSucursal(idSucursal);
+        return {
+          label: nombreDeSucursal(idSucursal),
+          data: meses.map((m) => Number((mapaImporte.get(m) || new Map()).get(idSucursal) || 0)),
+          borderColor: color,
+          backgroundColor: color + "33",
+          tension: 0.25,
+        };
+      });
+      dibujarGrafico("graficoPrestamosImporte", "line", etiquetas, datasetsImporte);
+
+      const filasTablaPrestamos = seleccionadas.map((id) => {
+        const filasSucursal = filas.filter((f) => f.idsucursal === id);
+        const totalCantidad = filasSucursal.reduce((acc, f) => acc + f.cantidad, 0);
+        const totalImporte = filasSucursal.reduce((acc, f) => acc + Number(f.importe), 0);
+        return [nombreDeSucursal(id), formatearNumero(totalCantidad), formatearMoneda(totalImporte)];
+      });
+      document.getElementById("tablaPrestamos").innerHTML = tabla(
+        ["Sucursal", "Préstamos otorgados (período)", "Importe otorgado (período)"],
+        filasTablaPrestamos
+      );
+
+      const totalCantidadGeneral = filas.reduce((acc, f) => acc + f.cantidad, 0);
+      const totalImporteGeneral = filas.reduce((acc, f) => acc + Number(f.importe), 0);
+      const promedioPorPrestamo = totalCantidadGeneral > 0 ? totalImporteGeneral / totalCantidadGeneral : 0;
+
+      pintarKpis("kpiPrestamos", [
+        { etiqueta: "Préstamos otorgados", valor: formatearNumero(totalCantidadGeneral) },
+        { etiqueta: "Importe otorgado", valor: formatearMoneda(totalImporteGeneral) },
+        { etiqueta: "Importe promedio", valor: formatearMoneda(promedioPorPrestamo) },
+      ]);
+    }
+
+    // --- Plazo Fijo ---
+
+    async function cargarDatosPlazoFijo() {
+      const { desde, hasta } = leerRangoFechas();
+      const respuesta = await fetch(`/api/estadisticas/plazo-fijo?desde=${desde}&hasta=${hasta}`);
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      datosCrudos.plazoFijo = await respuesta.json();
+      dibujarPlazoFijo();
+    }
+
+    function dibujarPlazoFijo() {
+      const seleccionadas = sucursalesSeleccionadas();
+      const filas = datosCrudos.plazoFijo.filter((f) => seleccionadas.includes(f.idsucursal));
+      const meses = mesesUnicos(filas);
+      const etiquetas = meses.map(etiquetaMes);
+      const mapaCantidad = agruparPorMesYSucursal(filas, "cantidad");
+      const mapaImporte = agruparPorMesYSucursal(filas, "importe");
+
+      const datasetsCantidad = seleccionadas.map((idSucursal) => {
+        const color = colorDeSucursal(idSucursal);
+        return {
+          label: nombreDeSucursal(idSucursal),
+          data: meses.map((m) => (mapaCantidad.get(m) || new Map()).get(idSucursal) || 0),
+          borderColor: color,
+          backgroundColor: color + "33",
+          tension: 0.25,
+        };
+      });
+      dibujarGrafico("graficoPlazoFijoCantidad", "line", etiquetas, datasetsCantidad);
+
+      const datasetsImporte = seleccionadas.map((idSucursal) => {
+        const color = colorDeSucursal(idSucursal);
+        return {
+          label: nombreDeSucursal(idSucursal),
+          data: meses.map((m) => Number((mapaImporte.get(m) || new Map()).get(idSucursal) || 0)),
+          borderColor: color,
+          backgroundColor: color + "33",
+          tension: 0.25,
+        };
+      });
+      dibujarGrafico("graficoPlazoFijoImporte", "line", etiquetas, datasetsImporte);
+
+      const filasTabla = seleccionadas.map((id) => {
+        const filasSucursal = filas.filter((f) => f.idsucursal === id);
+        const totalCantidad = filasSucursal.reduce((acc, f) => acc + f.cantidad, 0);
+        const totalImporte = filasSucursal.reduce((acc, f) => acc + Number(f.importe), 0);
+        const totalDiasPonderados = filasSucursal.reduce((acc, f) => acc + Number(f.diasPonderados), 0);
+        const diasPromedio = totalCantidad > 0 ? Math.round(totalDiasPonderados / totalCantidad) : 0;
+        return [nombreDeSucursal(id), formatearNumero(totalCantidad), formatearMoneda(totalImporte), `${diasPromedio} días`];
+      });
+      document.getElementById("tablaPlazoFijo").innerHTML = tabla(
+        ["Sucursal", "Cantidad (período)", "Importe colocado (período)", "Plazo promedio"],
+        filasTabla
+      );
+
+      const totalCantidadGeneral = filas.reduce((acc, f) => acc + f.cantidad, 0);
+      const totalImporteGeneral = filas.reduce((acc, f) => acc + Number(f.importe), 0);
+      const totalDiasGeneral = filas.reduce((acc, f) => acc + Number(f.diasPonderados), 0);
+      const diasPromedioGeneral = totalCantidadGeneral > 0 ? Math.round(totalDiasGeneral / totalCantidadGeneral) : 0;
+
+      pintarKpis("kpiPlazoFijo", [
+        { etiqueta: "Plazos fijos constituidos", valor: formatearNumero(totalCantidadGeneral) },
+        { etiqueta: "Importe colocado", valor: formatearMoneda(totalImporteGeneral) },
+        { etiqueta: "Plazo promedio", valor: `${diasPromedioGeneral} días` },
+      ]);
+    }
+
+    // --- TMU / Tarjeta +Unión ---
+
+    async function cargarDatosTarjetas() {
+      const { desde, hasta } = leerRangoFechas();
+      const respuesta = await fetch(`/api/estadisticas/tarjetas?desde=${desde}&hasta=${hasta}`);
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      datosCrudos.tarjetas = await respuesta.json();
+      dibujarTarjetas();
+    }
+
+    function lineaPorSucursal(idCanvas, filas, meses, campo, seleccionadas) {
+      const mapa = agruparPorMesYSucursal(filas, campo);
+      const datasets = seleccionadas.map((idSucursal) => {
+        const color = colorDeSucursal(idSucursal);
+        return {
+          label: nombreDeSucursal(idSucursal),
+          data: meses.map((m) => Number((mapa.get(m) || new Map()).get(idSucursal) || 0)),
+          borderColor: color,
+          backgroundColor: color + "33",
+          tension: 0.25,
+        };
+      });
+      dibujarGrafico(idCanvas, "line", meses.map(etiquetaMes), datasets);
+    }
+
+    function dibujarTarjetas() {
+      const seleccionadas = sucursalesSeleccionadas();
+      const filas = datosCrudos.tarjetas.filter((f) => seleccionadas.includes(f.idsucursal));
+      const meses = mesesUnicos(filas);
+
+      lineaPorSucursal("graficoTarjetasUsuarios", filas, meses, "cantusuario", seleccionadas);
+      lineaPorSucursal("graficoTarjetasConsumos", filas, meses, "cantusuconsumos", seleccionadas);
+      lineaPorSucursal("graficoTarjetasTotalConsumo", filas, meses, "totalconsumo", seleccionadas);
+      lineaPorSucursal("graficoTarjetasTotalPago", filas, meses, "totalpago", seleccionadas);
+
+      const filasTabla = seleccionadas.map((id) => {
+        const filasSucursal = filas.filter((f) => f.idsucursal === id);
+        const ultima = filasSucursal.length ? filasSucursal[filasSucursal.length - 1] : null;
+        const totalConsumo = filasSucursal.reduce((acc, f) => acc + Number(f.totalconsumo), 0);
+        const totalPago = filasSucursal.reduce((acc, f) => acc + Number(f.totalpago), 0);
+        return [
+          nombreDeSucursal(id),
+          formatearNumero(ultima ? ultima.cantusuario : 0),
+          formatearNumero(ultima ? ultima.cantusuconsumos : 0),
+          formatearMoneda(totalConsumo),
+          formatearMoneda(totalPago),
+        ];
+      });
+      document.getElementById("tablaTarjetas").innerHTML = tabla(
+        ["Sucursal", "Usuarios (actual)", "Usuarios con consumo (actual)", "Consumo total (período)", "Total pagado (período)"],
+        filasTabla
+      );
+
+      const usuariosActuales = seleccionadas.reduce((acc, id) => {
+        const filasSucursal = filas.filter((f) => f.idsucursal === id);
+        return acc + (filasSucursal.length ? filasSucursal[filasSucursal.length - 1].cantusuario : 0);
+      }, 0);
+      const totalConsumoGeneral = filas.reduce((acc, f) => acc + Number(f.totalconsumo), 0);
+      const totalPagoGeneral = filas.reduce((acc, f) => acc + Number(f.totalpago), 0);
+
+      pintarKpis("kpiTarjetas", [
+        { etiqueta: "Usuarios (actual)", valor: formatearNumero(usuariosActuales) },
+        { etiqueta: "Consumo total", valor: formatearMoneda(totalConsumoGeneral) },
+        { etiqueta: "Total pagado", valor: formatearMoneda(totalPagoGeneral) },
+      ]);
+    }
+
+    // --- Comercios (dato global, sin idsucursal) ---
+
+    async function cargarDatosComercios() {
+      const { desde, hasta } = leerRangoFechas();
+      const respuesta = await fetch(`/api/estadisticas/comercios?desde=${desde}&hasta=${hasta}`);
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      datosCrudos.comercios = await respuesta.json();
+      dibujarComercios();
+    }
+
+    function dibujarComercios() {
+      const filas = datosCrudos.comercios;
+      const etiquetas = filas.map((f) => etiquetaMes(f.idtiempo));
+
+      dibujarGrafico("graficoComerciosCantidad", "line", etiquetas, [
+        { label: "Comercios totales", data: filas.map((f) => f.cantcomtotal), borderColor: "#2f7fd1", backgroundColor: "#2f7fd133", tension: 0.25 },
+        { label: "Comercios con consumo", data: filas.map((f) => f.cantcomconsumo), borderColor: "#00915a", backgroundColor: "#00915a33", tension: 0.25 },
+      ]);
+
+      dibujarGrafico("graficoComerciosConsumo", "line", etiquetas, [
+        {
+          label: "Consumo total",
+          data: filas.map((f) => Number(f.totalcomconsumo)),
+          borderColor: "#e0a83f",
+          backgroundColor: "#e0a83f33",
+          tension: 0.25,
+          fill: true,
+        },
+      ]);
+
+      const ultima = filas.length ? filas[filas.length - 1] : null;
+      const totalConsumoPeriodo = filas.reduce((acc, f) => acc + Number(f.totalcomconsumo), 0);
+
+      pintarKpis("kpiComercios", [
+        { etiqueta: "Comercios totales (actual)", valor: formatearNumero(ultima ? ultima.cantcomtotal : 0) },
+        { etiqueta: "Comercios con consumo (actual)", valor: formatearNumero(ultima ? ultima.cantcomconsumo : 0) },
+        { etiqueta: "Consumo total (período)", valor: formatearMoneda(totalConsumoPeriodo) },
+      ]);
+    }
+
+    // --- Módulos "estándar" por sucursal (cantidad + total) ---
+    // Óptica, Trámites y Prácticas comparten la misma forma de datos:
+    // idtiempo, idsucursal, cantidad, total. En vez de repetir la misma
+    // lógica 3 veces, se arma una sola vez acá.
+    function crearModuloEstandar(claveCache, endpoint, ids) {
+      async function cargar() {
+        const { desde, hasta } = leerRangoFechas();
+        const respuesta = await fetch(`/api/estadisticas/${endpoint}?desde=${desde}&hasta=${hasta}`);
+        if (respuesta.status === 401) {
+          window.location.href = "/login.html";
+          return;
+        }
+        datosCrudos[claveCache] = await respuesta.json();
+        dibujar();
+      }
+
+      function dibujar() {
+        const seleccionadas = sucursalesSeleccionadas();
+        const filas = datosCrudos[claveCache].filter((f) => seleccionadas.includes(f.idsucursal));
+        const meses = mesesUnicos(filas);
+        const etiquetas = meses.map(etiquetaMes);
+        const mapaCantidad = agruparPorMesYSucursal(filas, "cantidad");
+        const mapaTotal = agruparPorMesYSucursal(filas, "total");
+
+        const datasetsCantidad = seleccionadas.map((idSucursal) => {
+          const color = colorDeSucursal(idSucursal);
+          return {
+            label: nombreDeSucursal(idSucursal),
+            data: meses.map((m) => (mapaCantidad.get(m) || new Map()).get(idSucursal) || 0),
+            borderColor: color,
+            backgroundColor: color + "33",
+            tension: 0.25,
+          };
+        });
+        dibujarGrafico(ids.canvasCantidad, "line", etiquetas, datasetsCantidad);
+
+        const datasetsTotal = seleccionadas.map((idSucursal) => {
+          const color = colorDeSucursal(idSucursal);
+          return {
+            label: nombreDeSucursal(idSucursal),
+            data: meses.map((m) => Number((mapaTotal.get(m) || new Map()).get(idSucursal) || 0)),
+            borderColor: color,
+            backgroundColor: color + "33",
+            tension: 0.25,
+          };
+        });
+        dibujarGrafico(ids.canvasTotal, "line", etiquetas, datasetsTotal);
+
+        const filasTabla = seleccionadas.map((id) => {
+          const filasSucursal = filas.filter((f) => f.idsucursal === id);
+          const totalCantidad = filasSucursal.reduce((acc, f) => acc + f.cantidad, 0);
+          const totalImporte = filasSucursal.reduce((acc, f) => acc + Number(f.total), 0);
+          return [nombreDeSucursal(id), formatearNumero(totalCantidad), formatearMoneda(totalImporte)];
+        });
+        document.getElementById(ids.tabla).innerHTML = tabla(
+          ["Sucursal", "Cantidad (período)", "Importe total (período)"],
+          filasTabla
+        );
+
+        const totalCantidadGeneral = filas.reduce((acc, f) => acc + f.cantidad, 0);
+        const totalImporteGeneral = filas.reduce((acc, f) => acc + Number(f.total), 0);
+
+        pintarKpis(ids.kpi, [
+          { etiqueta: "Cantidad total", valor: formatearNumero(totalCantidadGeneral) },
+          { etiqueta: "Importe total", valor: formatearMoneda(totalImporteGeneral) },
+        ]);
+      }
+
+      return { cargar, dibujar };
+    }
+
+    const moduloOptica = crearModuloEstandar("optica", "optica", {
+      canvasCantidad: "graficoOpticaCantidad",
+      canvasTotal: "graficoOpticaTotal",
+      tabla: "tablaOptica",
+      kpi: "kpiOptica",
+    });
+    const cargarDatosOptica = moduloOptica.cargar;
+    const dibujarOptica = moduloOptica.dibujar;
+
+    const moduloTramites = crearModuloEstandar("tramites", "tramites", {
+      canvasCantidad: "graficoTramitesCantidad",
+      canvasTotal: "graficoTramitesTotal",
+      tabla: "tablaTramites",
+      kpi: "kpiTramites",
+    });
+    const cargarDatosTramites = moduloTramites.cargar;
+    const dibujarTramites = moduloTramites.dibujar;
+
+    const moduloPracticas = crearModuloEstandar("practicas", "practicas", {
+      canvasCantidad: "graficoPracticasCantidad",
+      canvasTotal: "graficoPracticasTotal",
+      tabla: "tablaPracticas",
+      kpi: "kpiPracticas",
+    });
+
+    async function cargarDatosPracticas() {
+      const { desde, hasta } = leerRangoFechas();
+      const query = `desde=${desde}&hasta=${hasta}`;
+
+      const [, respPorProfesion, respPorProfesional] = await Promise.all([
+        moduloPracticas.cargar(),
+        fetch(`/api/estadisticas/practicas/por-profesion?${query}`),
+        fetch(`/api/estadisticas/practicas/por-profesional?${query}`),
+      ]);
+
+      if (respPorProfesion.status === 401 || respPorProfesional.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+
+      datosCrudos.practicasPorProfesion = await respPorProfesion.json();
+      datosCrudos.practicasPorProfesional = await respPorProfesional.json();
+      dibujarPracticasProfesionYProfesional();
+    }
+
+    function dibujarPracticas() {
+      moduloPracticas.dibujar();
+      dibujarPracticasProfesionYProfesional();
+    }
+
+    function dibujarPracticasProfesionYProfesional() {
+      if (!datosCrudos.practicasPorProfesion || !datosCrudos.practicasPorProfesional) return;
+
+      const porProfesion = [...datosCrudos.practicasPorProfesion].sort((a, b) => b.cantidad - a.cantidad);
+      dibujarGrafico(
+        "graficoPracticasProfesion",
+        "bar",
+        porProfesion.map((f) => f.etiqueta),
+        [{ label: "Cantidad", data: porProfesion.map((f) => f.cantidad), backgroundColor: "#2f7fd1" }]
+      );
+
+      // Ranking de profesionales: puede haber muchos, mostramos el top 10.
+      const topProfesionales = datosCrudos.practicasPorProfesional.slice(0, 10);
+      dibujarGrafico(
+        "graficoPracticasProfesional",
+        "bar",
+        topProfesionales.map((f) => f.nombre || `Profesional ${f.profesionalId}`),
+        [{ label: "Cantidad", data: topProfesionales.map((f) => f.cantidad), backgroundColor: "#00915a" }]
+      );
+      graficos.graficoPracticasProfesional.options.indexAxis = "y";
+      graficos.graficoPracticasProfesional.update();
+
+      const filasTabla = datosCrudos.practicasPorProfesional.map((f) => [
+        f.nombre || `Profesional ${f.profesionalId}`,
+        formatearNumero(f.cantidad),
+        formatearMoneda(f.total),
+      ]);
+      document.getElementById("tablaPracticasProfesionales").innerHTML = tabla(
+        ["Profesional", "Cantidad (período)", "Importe (período)"],
+        filasTabla
+      );
+    }
+
+    // --- Panteones (dato global, desglosado por tipo y forma de pago) ---
+
+    async function cargarDatosPanteones() {
+      const { desde, hasta } = leerRangoFechas();
+      const respuesta = await fetch(`/api/estadisticas/panteones?desde=${desde}&hasta=${hasta}`);
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      datosCrudos.panteones = await respuesta.json();
+      dibujarPanteones();
+    }
+
+    function totalesPorCategoria(filas, campoCategoria, campoValor) {
+      const mapa = new Map();
+      for (const fila of filas) {
+        mapa.set(fila[campoCategoria], (mapa.get(fila[campoCategoria]) || 0) + fila[campoValor]);
+      }
+      return [...mapa.entries()].sort((a, b) => b[1] - a[1]);
+    }
+
+    function dibujarPanteones() {
+      const filas = datosCrudos.panteones;
+      const meses = mesesUnicos(filas);
+
+      const totalesPorMes = meses.map((m) => filas.filter((f) => f.idtiempo === m).reduce((acc, f) => acc + f.cantidad, 0));
+      dibujarGrafico("graficoPanteonesTendencia", "line", meses.map(etiquetaMes), [
+        {
+          label: "Cantidad",
+          data: totalesPorMes,
+          borderColor: "#00915a",
+          backgroundColor: "#00915a33",
+          tension: 0.25,
+          fill: true,
+        },
+      ]);
+
+      const porTipo = totalesPorCategoria(filas, "tipo", "cantidad");
+      dibujarGrafico(
+        "graficoPanteonesTipo",
+        "bar",
+        porTipo.map(([tipo]) => tipo),
+        [{ label: "Cantidad", data: porTipo.map(([, cantidad]) => cantidad), backgroundColor: "#2f7fd1" }]
+      );
+
+      const porFormaPago = totalesPorCategoria(filas, "formapago", "cantidad");
+      dibujarGrafico(
+        "graficoPanteonesFormaPago",
+        "bar",
+        porFormaPago.map(([forma]) => forma),
+        [{ label: "Cantidad", data: porFormaPago.map(([, cantidad]) => cantidad), backgroundColor: "#e0a83f" }]
+      );
+
+      // Tabla de detalle: combinación tipo + forma de pago.
+      const combinaciones = new Map();
+      for (const fila of filas) {
+        const clave = `${fila.tipo}|${fila.formapago}`;
+        if (!combinaciones.has(clave)) {
+          combinaciones.set(clave, { tipo: fila.tipo, formapago: fila.formapago, cantidad: 0, importe: 0 });
+        }
+        const acumulado = combinaciones.get(clave);
+        acumulado.cantidad += fila.cantidad;
+        acumulado.importe += Number(fila.importe);
+      }
+      const filasTabla = [...combinaciones.values()]
+        .sort((a, b) => b.cantidad - a.cantidad)
+        .map((c) => [c.tipo, c.formapago, formatearNumero(c.cantidad), formatearMoneda(c.importe)]);
+      document.getElementById("tablaPanteones").innerHTML = tabla(
+        ["Tipo", "Forma de pago", "Cantidad (período)", "Importe (período)"],
+        filasTabla
+      );
+
+      const totalCantidadGeneral = filas.reduce((acc, f) => acc + f.cantidad, 0);
+      const totalImporteGeneral = filas.reduce((acc, f) => acc + Number(f.importe), 0);
+
+      pintarKpis("kpiPanteones", [
+        { etiqueta: "Cantidad total", valor: formatearNumero(totalCantidadGeneral) },
+        { etiqueta: "Importe total", valor: formatearMoneda(totalImporteGeneral) },
+      ]);
+    }
+
+    // --- Home Mutual (dato global, desglosado por tipo de consulta) ---
+
+    async function cargarDatosHomeMutual() {
+      const { desde, hasta } = leerRangoFechas();
+      const respuesta = await fetch(`/api/estadisticas/home-mutual?desde=${desde}&hasta=${hasta}`);
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      datosCrudos.homeMutual = await respuesta.json();
+      dibujarHomeMutual();
+    }
+
+    function dibujarHomeMutual() {
+      const filas = datosCrudos.homeMutual;
+
+      // Tendencia: consultas totales por mes (sumando todos los tipos).
+      const meses = mesesUnicos(filas);
+      const totalesPorMes = meses.map((m) => filas.filter((f) => f.idtiempo === m).reduce((acc, f) => acc + f.cantidad, 0));
+      dibujarGrafico("graficoHomeMutualTendencia", "line", meses.map(etiquetaMes), [
+        {
+          label: "Consultas",
+          data: totalesPorMes,
+          borderColor: "#00915a",
+          backgroundColor: "#00915a33",
+          tension: 0.25,
+          fill: true,
+        },
+      ]);
+
+      // Ranking: total del período por tipo de consulta, de mayor a menor.
+      // Con 19 tipos, un gráfico horizontal se lee mucho mejor que 19 líneas.
+      const totalesPorTipo = new Map();
+      for (const fila of filas) {
+        totalesPorTipo.set(fila.descrip, (totalesPorTipo.get(fila.descrip) || 0) + fila.cantidad);
+      }
+      const ranking = [...totalesPorTipo.entries()].sort((a, b) => b[1] - a[1]);
+
+      dibujarGrafico(
+        "graficoHomeMutualRanking",
+        "bar",
+        ranking.map(([descrip]) => descrip),
+        [{ label: "Consultas", data: ranking.map(([, cantidad]) => cantidad), backgroundColor: "#2f7fd1" }]
+      );
+      graficos.graficoHomeMutualRanking.options.indexAxis = "y";
+      graficos.graficoHomeMutualRanking.update();
+
+      const filasTabla = ranking.map(([descrip, cantidad]) => {
+        const socios = filas.filter((f) => f.descrip === descrip).reduce((acc, f) => acc + f.cantidadsocios, 0);
+        return [descrip, formatearNumero(cantidad), formatearNumero(socios)];
+      });
+      document.getElementById("tablaHomeMutual").innerHTML = tabla(
+        ["Tipo de consulta", "Consultas (período)", "Socios (acumulado)"],
+        filasTabla
+      );
+
+      const totalConsultas = filas.reduce((acc, f) => acc + f.cantidad, 0);
+      const tipoMasUsado = ranking.length ? ranking[0] : null;
+
+      pintarKpis("kpiHomeMutual", [
+        { etiqueta: "Consultas totales", valor: formatearNumero(totalConsultas) },
+        {
+          etiqueta: "Tipo más consultado",
+          valor: tipoMasUsado ? tipoMasUsado[0] : "—",
+          claseColor: "stat-texto",
+        },
+      ]);
+    }
+
+    (async function iniciar() {
+      await cargarRangoFechas();
+      llenarSelectsDeMeses();
+      pintarMenuModulos();
+      await cargarSucursales();
+    })();
+  </script>
+</body>
+</html>

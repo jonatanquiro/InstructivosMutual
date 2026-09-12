@@ -504,3 +504,499 @@ main {
   background: var(--verde);
   color: white;
 }
+
+/* --- Chat de preguntas frecuentes --- */
+
+.main-chat {
+  max-width: 700px;
+}
+
+.chat-caja {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.burbuja {
+  max-width: 80%;
+  padding: 0.7rem 1rem;
+  border-radius: 16px;
+  line-height: 1.45;
+  font-size: 0.95rem;
+}
+
+.burbuja-bot {
+  align-self: flex-start;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-bottom-left-radius: 4px;
+}
+
+.burbuja-usuario {
+  align-self: flex-end;
+  background: var(--verde);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.burbuja-opciones {
+  align-self: flex-start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  max-width: 90%;
+}
+
+.btn-opcion-chat {
+  padding: 0.55rem 1rem;
+  border-radius: 20px;
+  border: 1px solid var(--verde);
+  background: var(--verde-claro);
+  color: var(--texto);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.15s, opacity 0.15s;
+}
+
+.btn-opcion-chat:hover:not(:disabled) {
+  background: var(--verde);
+  color: white;
+}
+
+.opciones-usadas .btn-opcion-chat {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.opciones-usadas .btn-opcion-chat:disabled {
+  pointer-events: none;
+}
+
+/* --- Panel admin de preguntas frecuentes --- */
+
+.tabs-admin {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1.3rem;
+  flex-wrap: wrap;
+}
+
+.tab-admin {
+  padding: 0.55rem 1.1rem;
+  border-radius: 20px;
+  border: 1px solid var(--borde);
+  background: var(--superficie);
+  color: var(--texto);
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 500;
+}
+
+.tab-admin.activo {
+  background: var(--verde);
+  color: white;
+  border-color: var(--verde);
+}
+
+.panel-admin[hidden] { display: none; }
+
+.grilla-resumen {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.tarjeta-stat {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 1rem;
+  text-align: center;
+  box-shadow: var(--sombra);
+}
+
+.tarjeta-stat strong {
+  display: block;
+  font-size: 1.6rem;
+  color: var(--verde);
+}
+
+.tarjeta-stat span {
+  font-size: 0.78rem;
+  color: var(--texto-secundario);
+}
+
+.fila-pregunta-admin {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  margin-bottom: 0.7rem;
+  box-shadow: var(--sombra);
+  overflow: hidden;
+}
+
+.fila-pregunta-admin summary {
+  padding: 0.8rem 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  list-style: none;
+}
+
+.fila-pregunta-admin summary::-webkit-details-marker { display: none; }
+
+.fila-pregunta-admin summary::before {
+  content: "▸";
+  color: var(--verde);
+  transition: transform 0.15s;
+}
+
+.fila-pregunta-admin[open] summary::before {
+  transform: rotate(90deg);
+}
+
+.fila-pregunta-texto {
+  flex: 1;
+  font-weight: 500;
+}
+
+.fila-pregunta-modulo {
+  font-size: 0.78rem;
+  color: var(--texto-secundario);
+  background: var(--verde-claro);
+  padding: 0.2rem 0.6rem;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.fila-pregunta-estado {
+  font-size: 0.75rem;
+  color: var(--verde);
+  white-space: nowrap;
+}
+
+.fila-pregunta-estado.inactiva {
+  color: var(--texto-secundario);
+}
+
+.fila-pregunta-cuerpo {
+  padding: 0 1.1rem 1.1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border-top: 1px solid var(--borde);
+  padding-top: 0.9rem;
+}
+
+.fila-pregunta-cuerpo label {
+  font-size: 0.8rem;
+  color: var(--texto-secundario);
+}
+
+.fila-pregunta-cuerpo input[type="text"],
+.fila-pregunta-cuerpo select,
+.fila-pregunta-cuerpo textarea {
+  padding: 0.55rem;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: var(--bg);
+  color: var(--texto);
+  font-family: inherit;
+  resize: vertical;
+}
+
+.fila-pregunta-cuerpo .check-activa {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.3rem;
+}
+
+.fila-pregunta-cuerpo .btn-chico {
+  align-self: flex-start;
+  margin-top: 0.5rem;
+}
+
+/* --- Proyectos / estadísticas --- */
+
+.main-proyectos {
+  max-width: 1100px;
+}
+
+.grilla-menu-proyectos {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+}
+
+.tarjeta-modulo-proyecto {
+  border: 1px solid transparent;
+  font: inherit;
+  width: 100%;
+}
+
+.btn-volver-modulos {
+  border: none;
+  background: none;
+  color: var(--verde);
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  padding: 0.3rem 0;
+  margin-bottom: 1rem;
+}
+
+.btn-volver-modulos:hover { text-decoration: underline; }
+
+.barra-acciones-modulo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+
+.acciones-modulo-derecha {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.btn-presentacion {
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  border: 1px solid var(--verde);
+  background: transparent;
+  color: var(--verde);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-presentacion:hover {
+  background: var(--verde-claro);
+}
+
+.atajos-fecha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.atajos-fecha button {
+  padding: 0.35rem 0.75rem;
+  border-radius: 14px;
+  border: 1px solid var(--borde);
+  background: var(--bg);
+  color: var(--texto-secundario);
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.atajos-fecha button:hover {
+  border-color: var(--verde);
+  color: var(--verde);
+}
+
+.btn-salir-presentacion {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 100;
+  padding: 0.6rem 1.1rem;
+  border-radius: 20px;
+  border: none;
+  background: #e0483f;
+  color: white;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: var(--sombra-hover);
+}
+
+/* --- Modo Presentación --- */
+/* Pantalla limpia para mostrar en la reunión: se oculta todo lo que no
+   sea el contenido del módulo, y se agranda tipografía/números. */
+
+body.modo-presentacion header.barra,
+body.modo-presentacion .barra-inferior,
+body.modo-presentacion .barra-acciones-modulo .btn-volver-modulos,
+body.modo-presentacion .btn-presentacion,
+body.modo-presentacion .atajos-fecha {
+  display: none !important;
+}
+
+body.modo-presentacion .main-proyectos {
+  max-width: 1400px;
+  padding-bottom: 2rem;
+}
+
+body.modo-presentacion .titulo-seccion {
+  font-size: 1.4rem;
+}
+
+body.modo-presentacion .tarjeta-stat strong {
+  font-size: 2.4rem;
+}
+
+body.modo-presentacion .tarjeta-stat span {
+  font-size: 1rem;
+}
+
+body.modo-presentacion .caja-grafico h2 {
+  font-size: 1.2rem;
+}
+
+body.modo-presentacion .tabla-detalle .tabla-usuarios {
+  font-size: 1rem;
+}
+
+body.modo-presentacion .filtros-proyectos {
+  background: transparent;
+  border: none;
+  padding: 0.4rem 0;
+}
+
+.filtros-proyectos {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.3rem;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  padding: 0.9rem 1.1rem;
+}
+
+.filtros-proyectos label {
+  font-size: 0.85rem;
+  color: var(--texto-secundario);
+}
+
+.filtros-proyectos select,
+.filtros-proyectos input[type="month"] {
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: var(--bg);
+  color: var(--texto);
+}
+
+.filtros-proyectos .btn-chico {
+  margin-left: auto;
+}
+
+.filtro-sucursales {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.chip-sucursal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  border: 1px solid var(--borde);
+  background: var(--bg);
+  color: var(--texto);
+  font-size: 0.85rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.chip-sucursal input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.chip-punto {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-sucursal);
+  flex-shrink: 0;
+  opacity: 0.35;
+}
+
+.chip-sucursal:has(input:checked) {
+  border-color: var(--color-sucursal);
+  background: color-mix(in srgb, var(--color-sucursal) 12%, transparent);
+}
+
+.chip-sucursal:has(input:checked) .chip-punto {
+  opacity: 1;
+}
+
+.nota-grafico {
+  margin: -0.4rem 0 0.8rem;
+  font-size: 0.78rem;
+  color: var(--texto-secundario);
+}
+
+.tabla-detalle {
+  margin: -0.4rem 0 1.3rem;
+}
+
+.tabla-detalle .tabla-usuarios {
+  font-size: 0.82rem;
+}
+
+.titulo-seccion {
+  margin: 1.6rem 0 0.8rem;
+  font-size: 1.05rem;
+  color: var(--texto-secundario);
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+}
+
+.titulo-seccion:first-child {
+  margin-top: 0;
+}
+
+.grilla-2col {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1.1rem;
+}
+
+.grilla-2col .caja-grafico {
+  margin-bottom: 0;
+}
+
+.tarjeta-stat.stat-verde strong { color: var(--verde); }
+.tarjeta-stat.stat-rojo strong { color: #e0483f; }
+.tarjeta-stat.stat-texto strong { font-size: 0.95rem; color: var(--texto); }
+
+.caja-grafico {
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  box-shadow: var(--sombra);
+  padding: 1.2rem;
+  margin-bottom: 1.3rem;
+}
+
+.caja-grafico h2 {
+  margin: 0 0 0.9rem;
+  font-size: 1rem;
+}
+
+.form-usuario textarea {
+  padding: 0.55rem;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: var(--bg);
+  color: var(--texto);
+  font-family: inherit;
+  resize: vertical;
+}

@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Administrar Preguntas Frecuentes — Información Mutual</title>
+  <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
+  <script>
+    (function () {
+      var t = localStorage.getItem("tema");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-izq">
+      <img src="/img/logo-blanco.png" alt="Logo Mutual" class="logo-barra" />
+      <h1>Administrar Preguntas Frecuentes</h1>
+      <span class="saludo" id="saludo"></span>
+    </div>
+  </header>
+
+  <main>
+    <div class="tabs-admin">
+      <button class="tab-admin activo" data-tab="estadisticas">Estadísticas</button>
+      <button class="tab-admin" data-tab="modulos">Módulos</button>
+      <button class="tab-admin" data-tab="preguntas">Preguntas</button>
+    </div>
+
+    <!-- ESTADÍSTICAS -->
+    <section id="panel-estadisticas" class="panel-admin">
+      <div class="grilla-resumen" id="grillaResumen"></div>
+
+      <h2>Preguntas más consultadas</h2>
+      <div id="listaTopPreguntas">Cargando...</div>
+
+      <h2>Consultas por módulo</h2>
+      <div id="listaPorModulo">Cargando...</div>
+
+      <h2>Preguntas activas que nadie consultó</h2>
+      <div id="listaSinConsultas">Cargando...</div>
+    </section>
+
+    <!-- MÓDULOS -->
+    <section id="panel-modulos" class="panel-admin" hidden>
+      <div class="caja-usuarios">
+        <h2>Nuevo módulo</h2>
+        <form id="formNuevoModulo" class="form-usuario">
+          <div class="error" id="errorNuevoModulo"></div>
+          <label for="nuevoModuloNombre">Nombre</label>
+          <input type="text" id="nuevoModuloNombre" required autocomplete="off" />
+          <button type="submit">Crear módulo</button>
+        </form>
+      </div>
+
+      <h2>Módulos existentes</h2>
+      <div id="listaModulosAdmin">Cargando...</div>
+    </section>
+
+    <!-- PREGUNTAS -->
+    <section id="panel-preguntas" class="panel-admin" hidden>
+      <div class="caja-usuarios">
+        <h2>Nueva pregunta</h2>
+        <form id="formNuevaPregunta" class="form-usuario">
+          <div class="error" id="errorNuevaPregunta"></div>
+          <label for="nuevaPreguntaModulo">Módulo</label>
+          <select id="nuevaPreguntaModulo" required></select>
+          <label for="nuevaPreguntaTexto">Pregunta</label>
+          <input type="text" id="nuevaPreguntaTexto" required autocomplete="off" />
+          <label for="nuevaPreguntaRespuesta">Respuesta</label>
+          <textarea id="nuevaPreguntaRespuesta" rows="4" required></textarea>
+          <button type="submit">Crear pregunta</button>
+        </form>
+      </div>
+
+      <h2>Preguntas existentes</h2>
+      <input type="text" class="buscador" id="buscadorPreguntasAdmin" placeholder="Buscar pregunta..." />
+      <div id="listaPreguntasAdmin">Cargando...</div>
+    </section>
+  </main>
+
+  <footer class="barra-inferior">
+    <a href="/" class="btn-inferior principal">⌂ Menú principal</a>
+    <button id="btnSalir" class="btn-inferior peligro">Cerrar sesión</button>
+  </footer>
+
+  <script src="/comun.js"></script>
+  <script>
+    // --- Tabs ---
+    document.querySelectorAll(".tab-admin").forEach((boton) => {
+      boton.addEventListener("click", () => {
+        document.querySelectorAll(".tab-admin").forEach((b) => b.classList.remove("activo"));
+        document.querySelectorAll(".panel-admin").forEach((p) => (p.hidden = true));
+        boton.classList.add("activo");
+        document.getElementById(`panel-${boton.dataset.tab}`).hidden = false;
+      });
+    });
+
+    async function pedirJson(url, opciones) {
+      const respuesta = await fetch(url, opciones);
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return null;
+      }
+      const datos = await respuesta.json();
+      if (!respuesta.ok) {
+        throw new Error(datos.error || "Error de servidor");
+      }
+      return datos;
+    }
+
+    function tablaOMensaje(filas, encabezados, filaHtml, mensajeVacio) {
+      if (filas.length === 0) {
+        return `<div class="sin-resultados">${mensajeVacio}</div>`;
+      }
+      return `
+        <table class="tabla-usuarios">
+          <thead><tr>${encabezados.map((e) => `<th>${e}</th>`).join("")}</tr></thead>
+          <tbody>${filas.map(filaHtml).join("")}</tbody>
+        </table>
+      `;
+    }
+
+    // --- Estadísticas ---
+
+    async function cargarEstadisticas() {
+      const resumen = await pedirJson("/api/faq-admin/estadisticas/resumen");
+      const grilla = document.getElementById("grillaResumen");
+      grilla.innerHTML = `
+        <div class="tarjeta-stat"><strong>${resumen.modulosActivos}</strong><span>Módulos activos</span></div>
+        <div class="tarjeta-stat"><strong>${resumen.preguntasActivas}</strong><span>Preguntas activas</span></div>
+        <div class="tarjeta-stat"><strong>${resumen.consultasTotales}</strong><span>Consultas totales</span></div>
+        <div class="tarjeta-stat"><strong>${resumen.consultasUltimos30Dias}</strong><span>Consultas (30 días)</span></div>
+      `;
+
+      const top = await pedirJson("/api/faq-admin/estadisticas/top-preguntas");
+      document.getElementById("listaTopPreguntas").innerHTML = tablaOMensaje(
+        top,
+        ["Pregunta", "Módulo", "Consultas"],
+        (p) => `<tr><td>${p.pregunta}</td><td>${p.modulo_nombre}</td><td>${p.consultas}</td></tr>`,
+        "Todavía no hay consultas registradas."
+      );
+
+      const porModulo = await pedirJson("/api/faq-admin/estadisticas/por-modulo");
+      document.getElementById("listaPorModulo").innerHTML = tablaOMensaje(
+        porModulo,
+        ["Módulo", "Consultas"],
+        (m) => `<tr><td>${m.nombre}</td><td>${m.consultas}</td></tr>`,
+        "Sin datos."
+      );
+
+      const sinConsultas = await pedirJson("/api/faq-admin/estadisticas/sin-consultas");
+      document.getElementById("listaSinConsultas").innerHTML = tablaOMensaje(
+        sinConsultas,
+        ["Pregunta", "Módulo"],
+        (p) => `<tr><td>${p.pregunta}</td><td>${p.modulo_nombre}</td></tr>`,
+        "Todas las preguntas activas ya fueron consultadas alguna vez."
+      );
+    }
+
+    // --- Módulos ---
+    // Se ordenan alfabéticamente siempre (así es como se ven en el chat de
+    // preguntas frecuentes), por eso no hay ningún campo de "orden" a cargar.
+
+    let modulosCache = [];
+
+    async function cargarModulosAdmin() {
+      modulosCache = await pedirJson("/api/faq-admin/modulos");
+      pintarModulosAdmin();
+      llenarSelectModulos();
+    }
+
+    function pintarModulosAdmin() {
+      const contenedor = document.getElementById("listaModulosAdmin");
+      contenedor.innerHTML = tablaOMensaje(
+        modulosCache,
+        ["Nombre", "Activo", "Acciones"],
+        (modulo) => `
+          <tr data-id="${modulo.id}">
+            <td><input type="text" class="input-nombre" value="${modulo.nombre}" /></td>
+            <td><input type="checkbox" class="input-activo" ${modulo.activo ? "checked" : ""} /></td>
+            <td class="acciones-usuario"><button class="btn-chico btn-guardar">Guardar</button></td>
+          </tr>
+        `,
+        "No hay módulos cargados."
+      );
+
+      contenedor.querySelectorAll("tr[data-id]").forEach((fila) => {
+        fila.querySelector(".btn-guardar").addEventListener("click", () => guardarModulo(Number(fila.dataset.id), fila));
+      });
+    }
+
+    async function guardarModulo(id, fila) {
+      const nombre = fila.querySelector(".input-nombre").value.trim();
+      const activo = fila.querySelector(".input-activo").checked;
+
+      try {
+        await pedirJson(`/api/faq-admin/modulos/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre, activo }),
+        });
+        await cargarModulosAdmin();
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    document.getElementById("formNuevoModulo").addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      const errorEl = document.getElementById("errorNuevoModulo");
+      errorEl.textContent = "";
+
+      const nombre = document.getElementById("nuevoModuloNombre").value.trim();
+
+      try {
+        await pedirJson("/api/faq-admin/modulos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ nombre }),
+        });
+        document.getElementById("formNuevoModulo").reset();
+        await cargarModulosAdmin();
+      } catch (error) {
+        errorEl.textContent = error.message;
+      }
+    });
+
+    function llenarSelectModulos() {
+      const select = document.getElementById("nuevaPreguntaModulo");
+      select.innerHTML = modulosCache
+        .map((m) => `<option value="${m.id}">${m.nombre}${m.activo ? "" : " (inactivo)"}</option>`)
+        .join("");
+    }
+
+    // --- Preguntas ---
+    // Mismo criterio: se ordenan alfabéticamente por módulo y por pregunta,
+    // sin campo de orden manual.
+
+    let preguntasCache = [];
+
+    async function cargarPreguntasAdmin() {
+      preguntasCache = await pedirJson("/api/faq-admin/preguntas");
+      pintarPreguntasAdmin(preguntasCache);
+    }
+
+    function pintarPreguntasAdmin(lista) {
+      const contenedor = document.getElementById("listaPreguntasAdmin");
+
+      if (lista.length === 0) {
+        contenedor.innerHTML = '<div class="sin-resultados">No hay preguntas cargadas.</div>';
+        return;
+      }
+
+      contenedor.innerHTML = "";
+      for (const pregunta of lista) {
+        const fila = document.createElement("details");
+        fila.className = "fila-pregunta-admin";
+
+        const opcionesModulo = modulosCache
+          .map(
+            (m) =>
+              `<option value="${m.id}" ${m.id === pregunta.modulo_id ? "selected" : ""}>${m.nombre}</option>`
+          )
+          .join("");
+
+        fila.innerHTML = `
+          <summary>
+            <span class="fila-pregunta-texto">${pregunta.pregunta}</span>
+            <span class="fila-pregunta-modulo">${pregunta.modulo_nombre}</span>
+            <span class="fila-pregunta-estado ${pregunta.activo ? "" : "inactiva"}">${
+              pregunta.activo ? "Activa" : "Inactiva"
+            }</span>
+          </summary>
+          <div class="fila-pregunta-cuerpo">
+            <label>Módulo</label>
+            <select class="input-modulo">${opcionesModulo}</select>
+            <label>Pregunta</label>
+            <input type="text" class="input-pregunta" value="${pregunta.pregunta}" />
+            <label>Respuesta</label>
+            <textarea class="input-respuesta" rows="4">${pregunta.respuesta}</textarea>
+            <label class="check-activa">
+              <input type="checkbox" class="input-activo" ${pregunta.activo ? "checked" : ""} /> Activa
+            </label>
+            <button class="btn-chico btn-guardar-pregunta">Guardar</button>
+          </div>
+        `;
+
+        fila.querySelector(".btn-guardar-pregunta").addEventListener("click", () => guardarPregunta(pregunta.id, fila));
+        contenedor.appendChild(fila);
+      }
+    }
+
+    async function guardarPregunta(id, fila) {
+      const moduloId = Number(fila.querySelector(".input-modulo").value);
+      const pregunta = fila.querySelector(".input-pregunta").value.trim();
+      const respuesta = fila.querySelector(".input-respuesta").value.trim();
+      const activo = fila.querySelector(".input-activo").checked;
+
+      try {
+        await pedirJson(`/api/faq-admin/preguntas/${id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ moduloId, pregunta, respuesta, activo }),
+        });
+        await cargarPreguntasAdmin();
+      } catch (error) {
+        alert(error.message);
+      }
+    }
+
+    document.getElementById("formNuevaPregunta").addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      const errorEl = document.getElementById("errorNuevaPregunta");
+      errorEl.textContent = "";
+
+      const moduloId = Number(document.getElementById("nuevaPreguntaModulo").value);
+      const pregunta = document.getElementById("nuevaPreguntaTexto").value.trim();
+      const respuesta = document.getElementById("nuevaPreguntaRespuesta").value.trim();
+
+      try {
+        await pedirJson("/api/faq-admin/preguntas", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ moduloId, pregunta, respuesta }),
+        });
+        document.getElementById("formNuevaPregunta").reset();
+        await cargarPreguntasAdmin();
+      } catch (error) {
+        errorEl.textContent = error.message;
+      }
+    });
+
+    document.getElementById("buscadorPreguntasAdmin").addEventListener("input", (evento) => {
+      const texto = evento.target.value.trim().toLowerCase();
+      if (!texto) {
+        pintarPreguntasAdmin(preguntasCache);
+        return;
+      }
+      pintarPreguntasAdmin(preguntasCache.filter((p) => p.pregunta.toLowerCase().includes(texto)));
+    });
+
+    (async function iniciar() {
+      await cargarModulosAdmin();
+      await cargarPreguntasAdmin();
+      await cargarEstadisticas();
+    })();
+  </script>
+</body>
+</html>
