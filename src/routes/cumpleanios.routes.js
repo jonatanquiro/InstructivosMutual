@@ -20,13 +20,15 @@ router.get("/cumpleanios", async (req, res) => {
       ORDER BY proximoCumple
     `);
 
-    const cumples = resultado.recordset.map((fila) => ({
-      nombre: fila.nombre,
-      fecha: new Date(fila.proximoCumple).toLocaleDateString("es-AR", {
-        day: "2-digit",
-        month: "2-digit",
-      }),
-    }));
+    const cumples = resultado.recordset.map((fila) => {
+      const f = new Date(fila.proximoCumple);
+      const dia = String(f.getUTCDate()).padStart(2, "0");
+      const mes = String(f.getUTCMonth() + 1).padStart(2, "0");
+      return {
+        nombre: fila.nombre,
+        fecha: `${dia}/${mes}`,
+      };
+    });
 
     res.json(cumples);
   } catch (error) {
