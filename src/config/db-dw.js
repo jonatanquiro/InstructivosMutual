@@ -20,10 +20,23 @@ const config = {
 // config/db.js) para que este pool no pise el pool global de la otra base.
 let poolPromise = null;
 
-function getPoolDW() {
-  if (!poolPromise) {
-    poolPromise = new sql.ConnectionPool(config).connect();
+async function getPoolDW() {
+  if (poolPromise) {
+    try {
+      const pool = await poolPromise;
+      if (pool.connected) return pool;
+    } catch (error) {
+      // Si la conexión falló la última vez, caemos al bloque de abajo y
+      // reintentamos en vez de quedar devolviendo el mismo error para
+      // siempre hasta reiniciar el proceso.
+    }
+    poolPromise = null;
   }
+
+  poolPromise = new sql.ConnectionPool(config).connect().catch((error) => {
+    poolPromise = null;
+    throw error;
+  });
   return poolPromise;
 }
 

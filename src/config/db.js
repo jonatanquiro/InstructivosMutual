@@ -17,10 +17,22 @@ const config = {
 // esperen la misma conexión en vez de abrir dos pools por separado.
 let poolPromise = null;
 
-function getPool() {
-  if (!poolPromise) {
-    poolPromise = sql.connect(config);
+async function getPool() {
+  if (poolPromise) {
+    try {
+      const pool = await poolPromise;
+      if (pool.connected) return pool;
+    } catch (error) {
+      // Si la conexión falló la última vez, reintentamos en vez de quedar
+      // devolviendo el mismo error para siempre hasta reiniciar el proceso.
+    }
+    poolPromise = null;
   }
+
+  poolPromise = sql.connect(config).catch((error) => {
+    poolPromise = null;
+    throw error;
+  });
   return poolPromise;
 }
 
