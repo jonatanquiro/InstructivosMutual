@@ -34,11 +34,19 @@
     </div>
 
     <div id="resultado" hidden>
-      <div class="resumen-bcra">
-        <h2 id="resumenDenominacion"></h2>
-        <span class="resumen-bcra-periodo" id="resumenPeriodo"></span>
+      <h2 id="resumenDenominacion"></h2>
+
+      <h3 class="titulo-seccion">Deudas</h3>
+      <div class="resumen-bcra" id="cajaSelectorPeriodo">
+        <label class="resumen-bcra-periodo" for="selectPeriodo">
+          Período
+          <select id="selectPeriodo"></select>
+        </label>
       </div>
-      <div class="tabla-detalle" id="tablaResultado"></div>
+      <div class="tabla-detalle" id="tablaDeudas"></div>
+
+      <h3 class="titulo-seccion">Cheques Rechazados</h3>
+      <div class="tabla-detalle" id="tablaCheques"></div>
     </div>
   </main>
 
@@ -69,43 +77,127 @@
       return `${mes}/${anio}`;
     }
 
-    function pintarResultado(datos) {
-      document.getElementById("resumenDenominacion").textContent = datos.denominacion || `CUIT ${datos.identificacion}`;
-      document.getElementById("resumenPeriodo").textContent = `Último período informado: ${etiquetaPeriodo(datos.periodo)}`;
+    let periodosActuales = [];
 
-      const contenedor = document.getElementById("tablaResultado");
+    function pintarTablaPeriodo(periodo) {
+      const contenedor = document.getElementById("tablaDeudas");
 
-      if (datos.entidades.length === 0) {
+      if (periodo.entidades.length === 0) {
         contenedor.innerHTML = '<div class="sin-resultados">No hay deudas informadas para este período.</div>';
-      } else {
-        const filas = datos.entidades
-          .map(
-            (e) => `
-              <tr>
-                <td>${e.entidad}</td>
-                <td><span class="pastilla-situacion pastilla-situacion-${e.situacion}">${e.situacion} — ${e.situacionDescripcion}</span></td>
-                <td>${formatearMoneda(e.monto)}</td>
-                <td>${e.diasAtrasoPago ? e.diasAtrasoPago + " días" : "—"}</td>
-              </tr>
-            `
-          )
-          .join("");
-
-        contenedor.innerHTML = `
-          <table class="tabla-usuarios">
-            <thead>
-              <tr>
-                <th>Entidad</th>
-                <th>Situación</th>
-                <th>Monto</th>
-                <th>Días de atraso</th>
-              </tr>
-            </thead>
-            <tbody>${filas}</tbody>
-          </table>
-        `;
+        return;
       }
 
+      const filas = periodo.entidades
+        .map(
+          (e) => `
+            <tr>
+              <td>${e.entidad}</td>
+              <td><span class="pastilla-situacion pastilla-situacion-${e.situacion}">${e.situacion} — ${e.situacionDescripcion}</span></td>
+              <td>${formatearMoneda(e.monto)}</td>
+              <td>${e.diasAtrasoPago ? e.diasAtrasoPago + " días" : "—"}</td>
+            </tr>
+          `
+        )
+        .join("");
+
+      contenedor.innerHTML = `
+        <table class="tabla-usuarios">
+          <thead>
+            <tr>
+              <th>Entidad</th>
+              <th>Situación</th>
+              <th>Monto</th>
+              <th>Días de atraso</th>
+            </tr>
+          </thead>
+          <tbody>${filas}</tbody>
+        </table>
+      `;
+    }
+
+    function pintarDeudas(periodos) {
+      periodosActuales = periodos;
+      const cajaSelector = document.getElementById("cajaSelectorPeriodo");
+
+      if (periodos.length === 0) {
+        cajaSelector.hidden = true;
+        document.getElementById("tablaDeudas").innerHTML =
+          '<div class="sin-resultados">Sin deudas informadas en los últimos 24 meses.</div>';
+        return;
+      }
+
+      cajaSelector.hidden = false;
+      const selectPeriodo = document.getElementById("selectPeriodo");
+      // Los períodos vienen del más reciente al más antiguo (hasta 24
+      // meses, igual que la web oficial del BCRA).
+      selectPeriodo.innerHTML = periodos.map((p, indice) => `<option value="${indice}">${etiquetaPeriodo(p.periodo)}</option>`).join("");
+      selectPeriodo.value = "0";
+
+      pintarTablaPeriodo(periodos[0]);
+    }
+
+    document.getElementById("selectPeriodo").addEventListener("change", (evento) => {
+      pintarTablaPeriodo(periodosActuales[Number(evento.target.value)]);
+    });
+
+    // Aplana causal -> entidad -> detalle (cada cheque) en filas de tabla,
+    // repitiendo el causal solo cuando cambia, para que se lea como una
+    // lista agrupada sin perder el formato de tabla simple.
+    function pintarCheques(causales) {
+      const contenedor = document.getElementById("tablaCheques");
+      const filas = [];
+
+      for (const causal of causales) {
+        for (const entidad of causal.entidades) {
+          for (const cheque of entidad.detalle) {
+            filas.push({ causal: causal.causal, entidad: entidad.entidad, ...cheque });
+          }
+        }
+      }
+
+      if (filas.length === 0) {
+        contenedor.innerHTML = '<div class="sin-resultados">Sin cheques rechazados registrados.</div>';
+        return;
+      }
+
+      const filasHtml = filas
+        .map(
+          (c) => `
+            <tr>
+              <td>${c.causal || "—"}</td>
+              <td>Entidad Nº ${c.entidad ?? "—"}</td>
+              <td>${c.nroCheque ?? "—"}</td>
+              <td>${c.fechaRechazo || "—"}</td>
+              <td>${formatearMoneda(c.monto)}</td>
+              <td>${c.fechaPago ? "Pagado el " + c.fechaPago : "Sin pagar"}</td>
+              <td>${c.procesoJudicial ? "Sí" : "No"}</td>
+            </tr>
+          `
+        )
+        .join("");
+
+      contenedor.innerHTML = `
+        <table class="tabla-usuarios">
+          <thead>
+            <tr>
+              <th>Causal</th>
+              <th>Entidad</th>
+              <th>Nº Cheque</th>
+              <th>Fecha rechazo</th>
+              <th>Monto</th>
+              <th>Estado</th>
+              <th>Proceso judicial</th>
+            </tr>
+          </thead>
+          <tbody>${filasHtml}</tbody>
+        </table>
+      `;
+    }
+
+    function pintarResultado(datos) {
+      document.getElementById("resumenDenominacion").textContent = datos.denominacion || `CUIT ${datos.identificacion}`;
+      pintarDeudas(datos.periodos);
+      pintarCheques(datos.chequesRechazados);
       document.getElementById("resultado").hidden = false;
     }
 

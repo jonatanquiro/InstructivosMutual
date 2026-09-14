@@ -480,8 +480,20 @@ main {
 .resumen-bcra h2 { margin: 0; }
 
 .resumen-bcra-periodo {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   color: var(--texto-secundario);
   font-size: 0.85rem;
+}
+
+.resumen-bcra-periodo select {
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  background: var(--superficie);
+  color: var(--texto);
 }
 
 .pastilla-situacion {
