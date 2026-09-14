@@ -37,13 +37,20 @@
       <h2 id="resumenDenominacion"></h2>
 
       <h3 class="titulo-seccion">Deudas</h3>
-      <div class="resumen-bcra" id="cajaSelectorPeriodo">
-        <label class="resumen-bcra-periodo" for="selectPeriodo">
+      <div class="fila-filtros" id="cajaFiltrosDeudas">
+        <label for="selectEntidad">
+          Entidad
+          <select id="selectEntidad"></select>
+        </label>
+        <label for="selectPeriodo">
           Período
           <select id="selectPeriodo"></select>
         </label>
       </div>
       <div class="tabla-detalle" id="tablaDeudas"></div>
+
+      <h3 class="titulo-seccion">Total de deuda por período</h3>
+      <div class="tabla-detalle" id="tablaTotales"></div>
 
       <h3 class="titulo-seccion">Cheques Rechazados</h3>
       <div class="tabla-detalle" id="tablaCheques"></div>
@@ -78,23 +85,47 @@
     }
 
     let periodosActuales = [];
+    let entidadesActuales = [];
 
-    function pintarTablaPeriodo(periodo) {
+    function entidadSeleccionada() {
+      const indice = document.getElementById("selectEntidad").value;
+      return indice === "" ? null : entidadesActuales[Number(indice)];
+    }
+
+    // Tabla de detalle: por defecto muestra solo el período más reciente
+    // (como antes), pero el filtro de período admite "Todos los períodos"
+    // para ver de un saque los 24 meses, y el de entidad para no tener que
+    // buscar a mano entre varias financieras.
+    function pintarTablaDeudas() {
+      const entidad = entidadSeleccionada();
+      const filtroPeriodo = document.getElementById("selectPeriodo").value;
       const contenedor = document.getElementById("tablaDeudas");
 
-      if (periodo.entidades.length === 0) {
-        contenedor.innerHTML = '<div class="sin-resultados">No hay deudas informadas para este período.</div>';
+      const periodos = filtroPeriodo === "" ? periodosActuales : [periodosActuales[Number(filtroPeriodo)]];
+      const mostrarColumnaPeriodo = filtroPeriodo === "";
+
+      const filas = [];
+      for (const periodo of periodos) {
+        for (const e of periodo.entidades) {
+          if (entidad && e.entidad !== entidad) continue;
+          filas.push({ periodo: periodo.periodo, ...e });
+        }
+      }
+
+      if (filas.length === 0) {
+        contenedor.innerHTML = '<div class="sin-resultados">No hay deudas para este filtro.</div>';
         return;
       }
 
-      const filas = periodo.entidades
+      const filasHtml = filas
         .map(
-          (e) => `
+          (f) => `
             <tr>
-              <td>${e.entidad}</td>
-              <td><span class="pastilla-situacion pastilla-situacion-${e.situacion}">${e.situacion} — ${e.situacionDescripcion}</span></td>
-              <td>${formatearMoneda(e.monto)}</td>
-              <td>${e.diasAtrasoPago ? e.diasAtrasoPago + " días" : "—"}</td>
+              ${mostrarColumnaPeriodo ? `<td>${etiquetaPeriodo(f.periodo)}</td>` : ""}
+              <td>${f.entidad}</td>
+              <td><span class="pastilla-situacion pastilla-situacion-${f.situacion}">${f.situacion} — ${f.situacionDescripcion}</span></td>
+              <td>${formatearMoneda(f.monto)}</td>
+              <td>${f.diasAtrasoPago ? f.diasAtrasoPago + " días" : "—"}</td>
             </tr>
           `
         )
@@ -104,41 +135,105 @@
         <table class="tabla-usuarios">
           <thead>
             <tr>
+              ${mostrarColumnaPeriodo ? "<th>Período</th>" : ""}
               <th>Entidad</th>
               <th>Situación</th>
               <th>Monto</th>
               <th>Días de atraso</th>
             </tr>
           </thead>
-          <tbody>${filas}</tbody>
+          <tbody>${filasHtml}</tbody>
+        </table>
+      `;
+    }
+
+    // Total adeudado por período (sumando todas las entidades, o solo la
+    // filtrada), para ver la evolución de la deuda mes a mes sin tener que
+    // ir cambiando el período uno por uno.
+    function pintarTotalesPorPeriodo() {
+      const entidad = entidadSeleccionada();
+      const contenedor = document.getElementById("tablaTotales");
+
+      const filas = periodosActuales.map((periodo) => {
+        const entidades = entidad ? periodo.entidades.filter((e) => e.entidad === entidad) : periodo.entidades;
+        return {
+          periodo: periodo.periodo,
+          total: entidades.reduce((acc, e) => acc + e.monto, 0),
+          cantidad: entidades.length,
+        };
+      });
+
+      if (filas.every((f) => f.cantidad === 0)) {
+        contenedor.innerHTML = '<div class="sin-resultados">Sin datos para este filtro.</div>';
+        return;
+      }
+
+      const filasHtml = filas
+        .map(
+          (f) => `
+            <tr>
+              <td>${etiquetaPeriodo(f.periodo)}</td>
+              <td>${formatearMoneda(f.total)}</td>
+              <td>${f.cantidad}</td>
+            </tr>
+          `
+        )
+        .join("");
+
+      contenedor.innerHTML = `
+        <table class="tabla-usuarios">
+          <thead>
+            <tr>
+              <th>Período</th>
+              <th>Total adeudado</th>
+              <th>Entidades informantes</th>
+            </tr>
+          </thead>
+          <tbody>${filasHtml}</tbody>
         </table>
       `;
     }
 
     function pintarDeudas(periodos) {
       periodosActuales = periodos;
-      const cajaSelector = document.getElementById("cajaSelectorPeriodo");
+      const cajaFiltros = document.getElementById("cajaFiltrosDeudas");
 
       if (periodos.length === 0) {
-        cajaSelector.hidden = true;
+        cajaFiltros.hidden = true;
         document.getElementById("tablaDeudas").innerHTML =
           '<div class="sin-resultados">Sin deudas informadas en los últimos 24 meses.</div>';
+        document.getElementById("tablaTotales").innerHTML = "";
         return;
       }
 
-      cajaSelector.hidden = false;
-      const selectPeriodo = document.getElementById("selectPeriodo");
+      cajaFiltros.hidden = false;
+
+      entidadesActuales = [...new Set(periodos.flatMap((p) => p.entidades.map((e) => e.entidad)))].sort((a, b) =>
+        a.localeCompare(b, "es")
+      );
+      const selectEntidad = document.getElementById("selectEntidad");
+      selectEntidad.innerHTML =
+        '<option value="">Todas las entidades</option>' +
+        entidadesActuales.map((e, indice) => `<option value="${indice}">${e}</option>`).join("");
+      selectEntidad.value = "";
+
       // Los períodos vienen del más reciente al más antiguo (hasta 24
       // meses, igual que la web oficial del BCRA).
-      selectPeriodo.innerHTML = periodos.map((p, indice) => `<option value="${indice}">${etiquetaPeriodo(p.periodo)}</option>`).join("");
+      const selectPeriodo = document.getElementById("selectPeriodo");
+      selectPeriodo.innerHTML =
+        '<option value="">Todos los períodos</option>' +
+        periodos.map((p, indice) => `<option value="${indice}">${etiquetaPeriodo(p.periodo)}</option>`).join("");
       selectPeriodo.value = "0";
 
-      pintarTablaPeriodo(periodos[0]);
+      pintarTablaDeudas();
+      pintarTotalesPorPeriodo();
     }
 
-    document.getElementById("selectPeriodo").addEventListener("change", (evento) => {
-      pintarTablaPeriodo(periodosActuales[Number(evento.target.value)]);
+    document.getElementById("selectEntidad").addEventListener("change", () => {
+      pintarTablaDeudas();
+      pintarTotalesPorPeriodo();
     });
+    document.getElementById("selectPeriodo").addEventListener("change", pintarTablaDeudas);
 
     // Aplana causal -> entidad -> detalle (cada cheque) en filas de tabla,
     // repitiendo el causal solo cuando cambia, para que se lea como una
