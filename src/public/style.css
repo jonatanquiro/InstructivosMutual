@@ -460,6 +460,53 @@ main {
 
 .btn-chico:hover { background: var(--verde-claro); }
 
+/* --- Consulta BCRA (Central de Deudores) --- */
+
+.caja-consulta-bcra { max-width: 420px; }
+
+.form-consulta-bcra button:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.resumen-bcra {
+  display: flex;
+  align-items: baseline;
+  gap: 0.7rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.8rem;
+}
+
+.resumen-bcra h2 { margin: 0; }
+
+.resumen-bcra-periodo {
+  color: var(--texto-secundario);
+  font-size: 0.85rem;
+}
+
+.pastilla-situacion {
+  display: inline-block;
+  padding: 0.25rem 0.6rem;
+  border-radius: 16px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  background: var(--verde-claro);
+  color: var(--verde-oscuro);
+}
+
+.pastilla-situacion-2,
+.pastilla-situacion-3 {
+  background: #fbe9cc;
+  color: #a1650c;
+}
+
+.pastilla-situacion-4,
+.pastilla-situacion-5,
+.pastilla-situacion-6 {
+  background: #fbdcda;
+  color: #c22a20;
+}
+
 /* --- Configuración --- */
 
 .caja-config {

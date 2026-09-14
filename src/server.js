@@ -11,6 +11,7 @@ const estadisticasRoutes = require("./routes/estadisticas.routes");
 const cumpleaniosRoutes = require("./routes/cumpleanios.routes");
 const usuariosRoutes = require("./routes/usuarios.routes");
 const configRoutes = require("./routes/config.routes");
+const bcraRoutes = require("./routes/bcra.routes");
 
 const app = express();
 
@@ -35,6 +36,7 @@ app.use("/api", requiereLogin, requiereAdmin, usuariosRoutes);
 app.use("/api", requiereLogin, requiereAdmin, faqAdminRoutes);
 app.use("/api", requiereLogin, configRoutes);
 app.use("/api", requiereLogin, requiereAdmin, estadisticasRoutes);
+app.use("/api", requiereLogin, bcraRoutes);
 
 // usuarios.html, faq-admin.html y proyectos.html son solo para admins. Se
 // definen ANTES del static middleware para interceptar el pedido y no

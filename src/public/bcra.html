@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Situación BCRA — Información Mutual</title>
+  <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
+  <script>
+    (function () {
+      var t = localStorage.getItem("tema");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-izq">
+      <img src="/img/logo-blanco.png" alt="Logo Mutual" class="logo-barra" />
+      <h1>Situación BCRA</h1>
+      <span class="saludo" id="saludo"></span>
+    </div>
+  </header>
+
+  <main>
+    <div class="caja-usuarios caja-consulta-bcra">
+      <h2>Consultar Central de Deudores</h2>
+      <form id="formConsulta" class="form-usuario form-consulta-bcra">
+        <div class="error" id="errorConsulta"></div>
+        <label for="cuit">CUIT / CUIL</label>
+        <input type="text" id="cuit" placeholder="20123456789" inputmode="numeric" required autocomplete="off" />
+        <button type="submit" id="btnConsultar">Consultar</button>
+      </form>
+    </div>
+
+    <div id="resultado" hidden>
+      <div class="resumen-bcra">
+        <h2 id="resumenDenominacion"></h2>
+        <span class="resumen-bcra-periodo" id="resumenPeriodo"></span>
+      </div>
+      <div class="tabla-detalle" id="tablaResultado"></div>
+    </div>
+  </main>
+
+  <footer class="barra-inferior">
+    <a href="/enlaces.html" class="btn-inferior principal">◂ Enlaces Útiles</a>
+    <button id="btnSalir" class="btn-inferior peligro">Cerrar sesión</button>
+  </footer>
+
+  <script src="/comun.js"></script>
+  <script>
+    const DESCRIPCION_SITUACION = {
+      1: "Normal",
+      2: "Riesgo bajo",
+      3: "Riesgo medio",
+      4: "Riesgo alto",
+      5: "Irrecuperable",
+      6: "Irrecuperable (disp. técnica)",
+    };
+
+    function formatearMoneda(numero) {
+      return Number(numero || 0).toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
+    }
+
+    function etiquetaPeriodo(periodo) {
+      const texto = String(periodo);
+      const anio = texto.slice(0, 4);
+      const mes = texto.slice(4, 6);
+      return `${mes}/${anio}`;
+    }
+
+    function pintarResultado(datos) {
+      document.getElementById("resumenDenominacion").textContent = datos.denominacion || `CUIT ${datos.identificacion}`;
+      document.getElementById("resumenPeriodo").textContent = `Último período informado: ${etiquetaPeriodo(datos.periodo)}`;
+
+      const contenedor = document.getElementById("tablaResultado");
+
+      if (datos.entidades.length === 0) {
+        contenedor.innerHTML = '<div class="sin-resultados">No hay deudas informadas para este período.</div>';
+      } else {
+        const filas = datos.entidades
+          .map(
+            (e) => `
+              <tr>
+                <td>${e.entidad}</td>
+                <td><span class="pastilla-situacion pastilla-situacion-${e.situacion}">${e.situacion} — ${e.situacionDescripcion}</span></td>
+                <td>${formatearMoneda(e.monto)}</td>
+                <td>${e.diasAtrasoPago ? e.diasAtrasoPago + " días" : "—"}</td>
+              </tr>
+            `
+          )
+          .join("");
+
+        contenedor.innerHTML = `
+          <table class="tabla-usuarios">
+            <thead>
+              <tr>
+                <th>Entidad</th>
+                <th>Situación</th>
+                <th>Monto</th>
+                <th>Días de atraso</th>
+              </tr>
+            </thead>
+            <tbody>${filas}</tbody>
+          </table>
+        `;
+      }
+
+      document.getElementById("resultado").hidden = false;
+    }
+
+    document.getElementById("formConsulta").addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+
+      const cuit = document.getElementById("cuit").value.replace(/\D/g, "");
+      const error = document.getElementById("errorConsulta");
+      const boton = document.getElementById("btnConsultar");
+      error.textContent = "";
+      document.getElementById("resultado").hidden = true;
+
+      if (cuit.length !== 11) {
+        error.textContent = "Ingresá un CUIT/CUIL válido de 11 dígitos.";
+        return;
+      }
+
+      boton.disabled = true;
+      boton.textContent = "Consultando…";
+
+      try {
+        const respuesta = await fetch(`/api/bcra/deudas/${cuit}`);
+        if (respuesta.status === 401) {
+          window.location.href = "/login.html";
+          return;
+        }
+
+        const datos = await respuesta.json();
+
+        if (!respuesta.ok) {
+          error.textContent = datos.error || "No se pudo completar la consulta.";
+          return;
+        }
+
+        pintarResultado(datos);
+      } catch (e) {
+        error.textContent = "No se pudo conectar con el servidor.";
+      } finally {
+        boton.disabled = false;
+        boton.textContent = "Consultar";
+      }
+    });
+  </script>
+</body>
+</html>
