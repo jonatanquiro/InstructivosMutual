@@ -302,7 +302,7 @@
 
     function reiniciarPollingMensajes() {
       if (intervaloMensajes) clearInterval(intervaloMensajes);
-      intervaloMensajes = setInterval(revisarMensajesNuevos, 3000);
+      intervaloMensajes = setInterval(revisarMensajesNuevos, 2000);
     }
 
     inputImagen.addEventListener("change", () => {
@@ -481,7 +481,14 @@
         if (intervaloConversaciones) clearInterval(intervaloConversaciones);
       } else {
         detenerParpadeoTitulo();
-        if (conversacionActualId) reiniciarPollingMensajes();
+        // Al volver a la ventana, refrescamos ya mismo en vez de esperar
+        // al próximo tick del intervalo (podían pasar hasta 10s de espera).
+        if (conversacionActualId) {
+          revisarMensajesNuevos();
+          reiniciarPollingMensajes();
+        }
+        cargarConversaciones();
+        if (intervaloConversaciones) clearInterval(intervaloConversaciones);
         intervaloConversaciones = setInterval(cargarConversaciones, 10000);
       }
     });

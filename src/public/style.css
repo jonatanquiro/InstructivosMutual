@@ -1285,6 +1285,8 @@ body.modo-presentacion .filtros-proyectos {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 0.4rem;
   padding: 0.8rem;
   border-bottom: 1px solid var(--borde);
   font-weight: 600;
@@ -1349,7 +1351,7 @@ body.modo-presentacion .filtros-proyectos {
 
 .chat-imagen-mensaje {
   display: block;
-  max-width: 220px;
+  max-width: min(220px, 100%);
   max-height: 220px;
   border-radius: 8px;
   margin-top: 0.4rem;
@@ -1391,13 +1393,56 @@ body.modo-presentacion .filtros-proyectos {
 }
 
 @media (max-width: 700px) {
+  .main-chat-app {
+    max-width: 100%;
+  }
+
   .chat-app {
     flex-direction: column;
-    height: calc(100vh - 220px);
+    height: calc(100vh - 190px);
+    min-height: 480px;
+    gap: 0.7rem;
   }
 
   .chat-lista {
     width: 100%;
-    max-height: 160px;
+    flex: 0 0 auto;
+    max-height: 34vh;
+  }
+
+  .chat-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+
+  .chat-mensajes .burbuja {
+    max-width: 88%;
+  }
+
+  .chat-lista-header {
+    padding: 0.6rem;
+  }
+
+  .chat-form-envio {
+    padding: 0.5rem;
+  }
+
+  .chat-nombre-imagen {
+    max-width: 70px;
+  }
+}
+
+@media (max-width: 420px) {
+  .chat-lista-header span:first-child {
+    font-size: 0.8rem;
+  }
+
+  .btn-nuevo-chat {
+    padding: 0.3rem 0.45rem;
+    font-size: 0.68rem;
+  }
+
+  .chat-mensajes .burbuja {
+    max-width: 94%;
   }
 }
