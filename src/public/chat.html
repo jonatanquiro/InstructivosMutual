@@ -23,20 +23,32 @@
   </header>
 
   <main class="main-chat-app">
-    <p class="chat-app-aviso">Los mensajes se borran automáticamente a las 48hs.</p>
-
     <div class="chat-app">
       <aside class="chat-lista">
         <div class="chat-lista-header">
           <span>Conversaciones</span>
-          <button type="button" id="btnNuevoChat" class="btn-nuevo-chat" title="Nuevo chat privado">+ Nuevo</button>
+          <div class="chat-lista-header-botones">
+            <button type="button" id="btnNuevoChat" class="btn-nuevo-chat" title="Nuevo chat privado">+ Chat</button>
+            <button type="button" id="btnNuevoGrupo" class="btn-nuevo-chat" title="Nuevo grupo">+ Grupo</button>
+          </div>
         </div>
         <div id="pickerUsuarios" class="chat-picker-usuarios" hidden></div>
+        <div id="pickerGrupo" class="chat-picker-usuarios chat-picker-grupo" hidden>
+          <input type="text" id="inputNombreGrupo" class="chat-input-nombre-grupo" placeholder="Nombre del grupo" maxlength="150" />
+          <div id="listaCheckboxesGrupo" class="chat-lista-checkboxes"></div>
+          <button type="button" id="btnCrearGrupo" class="btn-inferior principal chat-btn-crear-grupo">Crear grupo</button>
+        </div>
         <div id="listaConversaciones" class="chat-lista-items"></div>
       </aside>
 
       <section class="chat-panel">
-        <div class="chat-panel-header" id="chatPanelHeader">Elegí una conversación</div>
+        <div class="chat-panel-header">
+          <div>
+            <div id="chatPanelHeader">Elegí una conversación</div>
+            <div id="chatPanelSubtitulo" class="chat-panel-subtitulo"></div>
+          </div>
+          <button type="button" id="btnBorrarConversacion" class="btn-borrar-conversacion" hidden title="Borrar todos los mensajes de esta conversación">🗑️ Borrar</button>
+        </div>
         <div class="chat-mensajes" id="chatMensajes"></div>
         <form id="formEnviar" class="chat-form-envio">
           <label class="chat-btn-adjuntar" title="Adjuntar imagen">
@@ -64,19 +76,38 @@
     let ultimoMensajeId = 0;
     let intervaloMensajes = null;
     let intervaloConversaciones = null;
+    let intervaloParpadeo = null;
+    let noLeidosOtrasConversaciones = 0;
+    let primeraCargaConversaciones = true;
+    const tituloOriginal = document.title;
+    const burbujasPropiasSinVisto = new Map();
 
     const listaConversaciones = document.getElementById("listaConversaciones");
     const chatMensajes = document.getElementById("chatMensajes");
     const chatPanelHeader = document.getElementById("chatPanelHeader");
+    const chatPanelSubtitulo = document.getElementById("chatPanelSubtitulo");
     const formEnviar = document.getElementById("formEnviar");
     const inputTexto = document.getElementById("inputTexto");
     const inputImagen = document.getElementById("inputImagen");
     const nombreImagenElegida = document.getElementById("nombreImagenElegida");
     const btnNuevoChat = document.getElementById("btnNuevoChat");
     const pickerUsuarios = document.getElementById("pickerUsuarios");
+    const btnNuevoGrupo = document.getElementById("btnNuevoGrupo");
+    const pickerGrupo = document.getElementById("pickerGrupo");
+    const inputNombreGrupo = document.getElementById("inputNombreGrupo");
+    const listaCheckboxesGrupo = document.getElementById("listaCheckboxesGrupo");
+    const btnCrearGrupo = document.getElementById("btnCrearGrupo");
+    const btnBorrarConversacion = document.getElementById("btnBorrarConversacion");
 
     function tituloConversacion(conversacion) {
-      return conversacion.tipo === "grupal" ? conversacion.nombre : conversacion.otro_nombre_completo;
+      if (conversacion.tipo === "privada") return conversacion.otro_nombre_completo;
+      return conversacion.nombre;
+    }
+
+    function subtituloPresencia(conversacion) {
+      if (conversacion.tipo === "privada") return conversacion.otro_en_linea ? "🟢 En línea" : "";
+      if (conversacion.tipo === "grupo") return `${conversacion.en_linea_count} de ${conversacion.total_participantes} en línea`;
+      return "";
     }
 
     function previewConversacion(conversacion) {
@@ -91,13 +122,59 @@
         const item = document.createElement("button");
         item.type = "button";
         item.className = "chat-item-conversacion" + (conversacion.id === conversacionActualId ? " activa" : "");
+        const punto = conversacion.tipo === "privada" && conversacion.otro_en_linea ? "🟢 " : "";
         item.innerHTML = `
-          <span class="chat-item-titulo">${tituloConversacion(conversacion)}</span>
+          <span class="chat-item-titulo">${punto}${tituloConversacion(conversacion)}</span>
           <span class="chat-item-preview">${previewConversacion(conversacion)}</span>
         `;
+        if (conversacion.no_leidos > 0) {
+          const badge = document.createElement("span");
+          badge.className = "chat-badge-no-leidos";
+          badge.textContent = conversacion.no_leidos > 9 ? "9+" : conversacion.no_leidos;
+          item.appendChild(badge);
+        }
         item.addEventListener("click", () => abrirConversacion(conversacion.id));
         listaConversaciones.appendChild(item);
       }
+    }
+
+    function avisarMensajeNuevo() {
+      reproducirBeep();
+      if (document.hidden) iniciarParpadeoTitulo();
+    }
+
+    function reproducirBeep() {
+      try {
+        const contexto = new (window.AudioContext || window.webkitAudioContext)();
+        const oscilador = contexto.createOscillator();
+        const volumen = contexto.createGain();
+        oscilador.frequency.value = 880;
+        volumen.gain.setValueAtTime(0.15, contexto.currentTime);
+        volumen.gain.exponentialRampToValueAtTime(0.001, contexto.currentTime + 0.25);
+        oscilador.connect(volumen).connect(contexto.destination);
+        oscilador.start();
+        oscilador.stop(contexto.currentTime + 0.25);
+      } catch (error) {
+        // Si el navegador todavía no permite audio (sin interacción previa
+        // del usuario), no rompemos nada: simplemente no suena.
+      }
+    }
+
+    function iniciarParpadeoTitulo() {
+      if (intervaloParpadeo) return;
+      let mostrandoAviso = false;
+      intervaloParpadeo = setInterval(() => {
+        document.title = mostrandoAviso ? tituloOriginal : "💬 Mensaje nuevo";
+        mostrandoAviso = !mostrandoAviso;
+      }, 1000);
+    }
+
+    function detenerParpadeoTitulo() {
+      if (intervaloParpadeo) {
+        clearInterval(intervaloParpadeo);
+        intervaloParpadeo = null;
+      }
+      document.title = tituloOriginal;
     }
 
     async function cargarConversaciones() {
@@ -108,6 +185,18 @@
       }
       conversaciones = await respuesta.json();
       pintarListaConversaciones();
+
+      const totalOtras = conversaciones
+        .filter((c) => c.id !== conversacionActualId)
+        .reduce((suma, c) => suma + (c.no_leidos || 0), 0);
+      if (!primeraCargaConversaciones && totalOtras > noLeidosOtrasConversaciones) avisarMensajeNuevo();
+      noLeidosOtrasConversaciones = totalOtras;
+      primeraCargaConversaciones = false;
+
+      if (conversacionActualId) {
+        const actual = conversaciones.find((c) => c.id === conversacionActualId);
+        if (actual) chatPanelSubtitulo.textContent = subtituloPresencia(actual);
+      }
     }
 
     function scrollAbajo() {
@@ -143,16 +232,44 @@
         burbuja.appendChild(enlace);
       }
 
+      if (esPropio && mensaje.visto !== undefined) {
+        const check = document.createElement("span");
+        check.className = "chat-check" + (mensaje.visto ? " visto" : "");
+        check.textContent = mensaje.visto ? "✓✓" : "✓";
+        burbuja.appendChild(check);
+        if (!mensaje.visto) burbujasPropiasSinVisto.set(mensaje.id, check);
+      }
+
       chatMensajes.appendChild(burbuja);
       ultimoMensajeId = Math.max(ultimoMensajeId, mensaje.id);
+    }
+
+    async function actualizarVistos() {
+      if (!conversacionActualId || burbujasPropiasSinVisto.size === 0) return;
+      const respuesta = await fetch(`/api/chat/conversaciones/${conversacionActualId}/lecturas`);
+      if (!respuesta.ok) return;
+      const lecturas = await respuesta.json();
+      if (lecturas.length === 0) return;
+
+      for (const [mensajeId, check] of burbujasPropiasSinVisto) {
+        const visto = lecturas.every((otro) => otro.ultimo_mensaje_id >= mensajeId);
+        if (visto) {
+          check.textContent = "✓✓";
+          check.classList.add("visto");
+          burbujasPropiasSinVisto.delete(mensajeId);
+        }
+      }
     }
 
     async function abrirConversacion(id) {
       conversacionActualId = id;
       ultimoMensajeId = 0;
       chatMensajes.innerHTML = "";
+      burbujasPropiasSinVisto.clear();
       const conversacion = conversaciones.find((c) => c.id === id);
       chatPanelHeader.textContent = conversacion ? tituloConversacion(conversacion) : "";
+      chatPanelSubtitulo.textContent = conversacion ? subtituloPresencia(conversacion) : "";
+      btnBorrarConversacion.hidden = false;
       pintarListaConversaciones();
 
       const respuesta = await fetch(`/api/chat/conversaciones/${id}/mensajes`);
@@ -178,7 +295,9 @@
       if (mensajes.length > 0) {
         mensajes.forEach(agregarMensaje);
         scrollAbajo();
+        if (mensajes.some((m) => m.usuario_id !== usuarioId)) avisarMensajeNuevo();
       }
+      actualizarVistos();
     }
 
     function reiniciarPollingMensajes() {
@@ -238,6 +357,7 @@
     });
 
     btnNuevoChat.addEventListener("click", async () => {
+      pickerGrupo.hidden = true;
       if (!pickerUsuarios.hidden) {
         pickerUsuarios.hidden = true;
         return;
@@ -252,7 +372,7 @@
         const item = document.createElement("button");
         item.type = "button";
         item.className = "chat-picker-item";
-        item.textContent = usuario.nombre_completo;
+        item.textContent = (usuario.en_linea ? "🟢 " : "") + usuario.nombre_completo;
         item.addEventListener("click", async () => {
           pickerUsuarios.hidden = true;
           const creacion = await fetch("/api/chat/conversaciones", {
@@ -267,6 +387,75 @@
         pickerUsuarios.appendChild(item);
       }
       pickerUsuarios.hidden = false;
+    });
+
+    btnNuevoGrupo.addEventListener("click", async () => {
+      pickerUsuarios.hidden = true;
+      if (!pickerGrupo.hidden) {
+        pickerGrupo.hidden = true;
+        return;
+      }
+      const respuesta = await fetch("/api/chat/usuarios");
+      const usuarios = await respuesta.json();
+      inputNombreGrupo.value = "";
+      listaCheckboxesGrupo.innerHTML = "";
+      if (usuarios.length === 0) {
+        listaCheckboxesGrupo.innerHTML = "<div class='chat-picker-vacio'>No hay otros usuarios activos</div>";
+      }
+      for (const usuario of usuarios) {
+        const label = document.createElement("label");
+        label.className = "chat-checkbox-usuario";
+        label.innerHTML = `<input type="checkbox" value="${usuario.id}" /> ${usuario.en_linea ? "🟢 " : ""}${usuario.nombre_completo}`;
+        listaCheckboxesGrupo.appendChild(label);
+      }
+      pickerGrupo.hidden = false;
+    });
+
+    btnCrearGrupo.addEventListener("click", async () => {
+      const nombre = inputNombreGrupo.value.trim();
+      const participantesIds = [...listaCheckboxesGrupo.querySelectorAll("input:checked")].map((c) => Number(c.value));
+
+      if (!nombre) return alert("Ponele un nombre al grupo");
+      if (participantesIds.length === 0) return alert("Elegí al menos un participante");
+
+      const creacion = await fetch("/api/chat/grupos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ nombre, participantesIds }),
+      });
+      if (!creacion.ok) {
+        const error = await creacion.json().catch(() => ({}));
+        alert(error.error || "No se pudo crear el grupo");
+        return;
+      }
+
+      const datos = await creacion.json();
+      pickerGrupo.hidden = true;
+      await cargarConversaciones();
+      abrirConversacion(datos.id);
+    });
+
+    btnBorrarConversacion.addEventListener("click", async () => {
+      if (!conversacionActualId) return;
+      const conversacion = conversaciones.find((c) => c.id === conversacionActualId);
+      const nombre = conversacion ? tituloConversacion(conversacion) : "esta conversación";
+      if (!confirm(`¿Borrar todos los mensajes de "${nombre}"? No se puede deshacer.`)) return;
+
+      const respuesta = await fetch(`/api/chat/conversaciones/${conversacionActualId}/mensajes`, {
+        method: "DELETE",
+      });
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      if (!respuesta.ok) {
+        alert("No se pudieron borrar los mensajes");
+        return;
+      }
+
+      chatMensajes.innerHTML = "";
+      ultimoMensajeId = 0;
+      cargarConversaciones();
     });
 
     async function iniciar() {
@@ -291,6 +480,7 @@
         if (intervaloMensajes) clearInterval(intervaloMensajes);
         if (intervaloConversaciones) clearInterval(intervaloConversaciones);
       } else {
+        detenerParpadeoTitulo();
         if (conversacionActualId) reiniciarPollingMensajes();
         intervaloConversaciones = setInterval(cargarConversaciones, 10000);
       }

@@ -14,7 +14,6 @@ const usuariosRoutes = require("./routes/usuarios.routes");
 const configRoutes = require("./routes/config.routes");
 const bcraRoutes = require("./routes/bcra.routes");
 const chatRoutes = require("./routes/chat.routes");
-const { limpiarMensajesViejos } = require("./jobs/limpieza-chat");
 
 const app = express();
 
@@ -87,8 +86,3 @@ const PUERTO = process.env.PORT || 3000;
 app.listen(PUERTO, () => {
   console.log(`Servidor escuchando en http://localhost:${PUERTO}`);
 });
-
-// Limpieza de mensajes de chat viejos: una vez al arrancar y después cada
-// 30 minutos. El chat es para coordinación de corto plazo, no historial.
-limpiarMensajesViejos();
-setInterval(limpiarMensajesViejos, 30 * 60 * 1000);

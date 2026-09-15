@@ -67,8 +67,10 @@ CREATE TABLE app_consultas_log (
 GO
 
 -- Chat interno: canal grupal "General" + conversaciones privadas 1 a 1,
--- con adjuntos de imagen. Los mensajes se purgan solos a las 48hs desde el
--- job de limpieza del servidor (src/jobs/limpieza-chat.js).
+-- con adjuntos de imagen. El texto de cada mensaje se guarda cifrado
+-- (src/config/cifrado.js, AES-256-GCM) para que no quede legible desde la
+-- base directamente; por eso es NVARCHAR(MAX) y no un largo fijo. No hay
+-- borrado automático: cada conversación se borra a mano desde el chat.
 IF OBJECT_ID('app_chat_mensajes', 'U') IS NOT NULL DROP TABLE app_chat_mensajes;
 IF OBJECT_ID('app_chat_participantes', 'U') IS NOT NULL DROP TABLE app_chat_participantes;
 IF OBJECT_ID('app_chat_conversaciones', 'U') IS NOT NULL DROP TABLE app_chat_conversaciones;
@@ -93,11 +95,21 @@ CREATE TABLE app_chat_mensajes (
     id              INT IDENTITY(1,1) PRIMARY KEY,
     conversacion_id INT NOT NULL FOREIGN KEY REFERENCES app_chat_conversaciones(id),
     usuario_id      INT NOT NULL FOREIGN KEY REFERENCES app_usuarios(id),
-    texto           NVARCHAR(2000) NULL,
+    texto           NVARCHAR(MAX) NULL,  -- cifrado (base64), no texto plano
     imagen_archivo  NVARCHAR(300) NULL,
     fecha           DATETIME NOT NULL DEFAULT GETDATE()
 );
 CREATE INDEX IX_chat_mensajes_conversacion ON app_chat_mensajes(conversacion_id, fecha);
+GO
+
+-- Hasta qué mensaje leyó cada usuario en cada conversación (badge de no
+-- leídos + "visto" estilo WhatsApp en los DMs y grupos).
+CREATE TABLE app_chat_lecturas (
+    conversacion_id   INT NOT NULL FOREIGN KEY REFERENCES app_chat_conversaciones(id),
+    usuario_id        INT NOT NULL FOREIGN KEY REFERENCES app_usuarios(id),
+    ultimo_mensaje_id INT NOT NULL DEFAULT 0,
+    PRIMARY KEY (conversacion_id, usuario_id)
+);
 GO
 
 INSERT INTO app_chat_conversaciones (tipo, nombre) VALUES ('grupal', 'General');

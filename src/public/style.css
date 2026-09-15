@@ -1065,12 +1065,6 @@ body.modo-presentacion .filtros-proyectos {
   max-width: 1000px;
 }
 
-.chat-app-aviso {
-  margin: 0 0 0.8rem;
-  font-size: 0.8rem;
-  color: var(--texto-secundario);
-}
-
 .chat-app {
   display: flex;
   gap: 1rem;
@@ -1087,17 +1081,24 @@ body.modo-presentacion .filtros-proyectos {
   border: 1px solid var(--borde);
   border-radius: var(--radio);
   overflow: hidden;
-  position: relative;
 }
 
 .chat-lista-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  row-gap: 0.4rem;
   padding: 0.8rem;
   border-bottom: 1px solid var(--borde);
   font-size: 0.85rem;
   font-weight: 600;
+}
+
+.chat-lista-header-botones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
 }
 
 .btn-nuevo-chat {
@@ -1105,8 +1106,9 @@ body.modo-presentacion .filtros-proyectos {
   background: var(--verde-claro);
   color: var(--texto);
   border-radius: 14px;
-  padding: 0.3rem 0.6rem;
-  font-size: 0.75rem;
+  padding: 0.3rem 0.55rem;
+  font-size: 0.72rem;
+  white-space: nowrap;
   cursor: pointer;
 }
 
@@ -1121,6 +1123,7 @@ body.modo-presentacion .filtros-proyectos {
 }
 
 .chat-item-conversacion {
+  position: relative;
   display: flex;
   flex-direction: column;
   gap: 0.15rem;
@@ -1133,6 +1136,21 @@ body.modo-presentacion .filtros-proyectos {
   color: var(--texto);
   cursor: pointer;
   font-family: inherit;
+}
+
+.chat-badge-no-leidos {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.7rem;
+  background: var(--verde);
+  color: white;
+  font-size: 0.7rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.25rem 0.4rem;
+  border-radius: 10px;
+  min-width: 1.1rem;
+  text-align: center;
 }
 
 .chat-item-conversacion:hover {
@@ -1157,17 +1175,16 @@ body.modo-presentacion .filtros-proyectos {
 }
 
 .chat-picker-usuarios {
-  position: absolute;
-  top: 3.2rem;
-  left: 0.5rem;
-  right: 0.5rem;
+  /* Antes iba con position:absolute a una altura fija, pero el header de
+     arriba (con "+ Chat" y "+ Grupo") puede ocupar más de una línea según
+     el ancho, y un offset fijo terminaba tapando el picker. En flujo
+     normal, siempre cae justo debajo del header sin importar su alto. */
   background: var(--superficie);
-  border: 1px solid var(--borde);
-  border-radius: 8px;
+  border-bottom: 1px solid var(--borde);
   box-shadow: var(--sombra-hover);
-  z-index: 5;
   max-height: 220px;
   overflow-y: auto;
+  flex-shrink: 0;
 }
 
 .chat-picker-item {
@@ -1194,6 +1211,46 @@ body.modo-presentacion .filtros-proyectos {
   color: var(--texto-secundario);
 }
 
+.chat-picker-grupo {
+  padding: 0.7rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 320px;
+}
+
+.chat-input-nombre-grupo {
+  padding: 0.5rem 0.7rem;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  background: var(--bg);
+  color: var(--texto);
+  font-family: inherit;
+}
+
+.chat-lista-checkboxes {
+  overflow-y: auto;
+  max-height: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.chat-checkbox-usuario {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.chat-btn-crear-grupo {
+  align-self: flex-end;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.9rem;
+}
+
 .chat-panel {
   flex: 1;
   display: flex;
@@ -1206,10 +1263,36 @@ body.modo-presentacion .filtros-proyectos {
 }
 
 .chat-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 0.8rem;
   border-bottom: 1px solid var(--borde);
   font-weight: 600;
   font-size: 0.95rem;
+}
+
+.chat-panel-subtitulo {
+  font-weight: 400;
+  font-size: 0.75rem;
+  color: var(--texto-secundario);
+  min-height: 1em;
+}
+
+.btn-borrar-conversacion {
+  border: 1px solid var(--borde);
+  background: transparent;
+  color: var(--texto-secundario);
+  border-radius: 14px;
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-borrar-conversacion:hover {
+  border-color: #e0483f;
+  color: #e0483f;
 }
 
 .chat-mensajes {
@@ -1230,6 +1313,19 @@ body.modo-presentacion .filtros-proyectos {
   font-weight: 600;
   opacity: 0.75;
   margin-bottom: 0.15rem;
+}
+
+.chat-check {
+  display: block;
+  text-align: right;
+  font-size: 0.7rem;
+  opacity: 0.7;
+  margin-top: 0.2rem;
+}
+
+.chat-check.visto {
+  opacity: 1;
+  color: #9fd8ff;
 }
 
 .chat-imagen-mensaje {

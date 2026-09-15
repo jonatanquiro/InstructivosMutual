@@ -1,7 +1,13 @@
+const { registrarActividad } = require("../config/presencia");
+
 // Corta el paso si no hay sesión iniciada. Lo usamos delante de cualquier
 // ruta (página o API) que solo deban ver usuarios logueados.
 function requiereLogin(req, res, next) {
   if (req.session && req.session.usuarioId) {
+    // Cualquier request autenticado cuenta como "está usando la app ahora":
+    // así el chat puede mostrar "en línea" sin depender de que la persona
+    // esté justo en la pantalla del chat.
+    registrarActividad(req.session.usuarioId);
     return next();
   }
 
