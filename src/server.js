@@ -1,4 +1,7 @@
-require("dotenv").config();
+// Por defecto carga ".env" (producción). Para levantar una instancia de
+// testeo en paralelo, sin tocar la de producción, se arranca con
+// ENV_FILE=.env.test (ver npm run dev:test / start:test en package.json).
+require("dotenv").config({ path: process.env.ENV_FILE || ".env" });
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
@@ -21,6 +24,11 @@ app.use(express.json());
 
 app.use(
   session({
+    // Nombre de cookie distinto en test (SESSION_COOKIE_NAME en .env.test):
+    // los navegadores comparten cookies entre puertos del mismo host, así
+    // que sin esto loguearte en el testeo (3001) pisaría la sesión de
+    // producción (3000) si los probás desde el mismo navegador.
+    name: process.env.SESSION_COOKIE_NAME || "connect.sid",
     secret: process.env.SESSION_SECRET || "cambiar-este-secreto-en-produccion",
     resave: false,
     saveUninitialized: false,
@@ -51,8 +59,9 @@ app.use("/api", requiereLogin, requiereAdmin, estadisticasRoutes);
 
 // Carpeta donde se guardan las imágenes adjuntadas al chat. Se sirve detrás
 // de requiereLogin (antes del static general) porque son datos internos de
-// la mutual, no contenido público como /img.
-const CARPETA_UPLOADS_CHAT = path.join(__dirname, "uploads", "chat");
+// la mutual, no contenido público como /img. CHAT_UPLOADS_DIR permite que
+// la instancia de testeo use una carpeta separada de la de producción.
+const CARPETA_UPLOADS_CHAT = path.join(__dirname, process.env.CHAT_UPLOADS_DIR || "uploads/chat");
 fs.mkdirSync(CARPETA_UPLOADS_CHAT, { recursive: true });
 app.use("/uploads/chat", requiereLogin, express.static(CARPETA_UPLOADS_CHAT));
 

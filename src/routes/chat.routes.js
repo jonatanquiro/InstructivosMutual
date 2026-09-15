@@ -9,7 +9,10 @@ const { estaEnLinea } = require("../config/presencia");
 
 const router = express.Router();
 
-const CARPETA_UPLOADS = path.join(__dirname, "..", "uploads", "chat");
+// Tiene que coincidir con la carpeta que sirve server.js en /uploads/chat.
+// CHAT_UPLOADS_DIR permite que la instancia de testeo use una carpeta
+// separada de la de producción (ver .env.test).
+const CARPETA_UPLOADS = path.join(__dirname, "..", process.env.CHAT_UPLOADS_DIR || "uploads/chat");
 const TIPOS_IMAGEN_PERMITIDOS = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const EXTENSION_POR_TIPO = {
   "image/jpeg": ".jpg",

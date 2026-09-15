@@ -6,7 +6,9 @@
   "main": "src/server.js",
   "scripts": {
     "start": "node src/server.js",
-    "dev": "node --watch src/server.js"
+    "dev": "node --watch src/server.js",
+    "start:test": "set ENV_FILE=.env.test&& node src/server.js",
+    "dev:test": "set ENV_FILE=.env.test&& node --watch src/server.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

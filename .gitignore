@@ -1,5 +1,6 @@
 node_modules/
 .env
+.env.test
 tmp/
 Thumbs.db
 src/uploads/

@@ -36,9 +36,10 @@
         <span class="tarjeta-desc">Accesos rápidos a sitios y sistemas externos</span>
       </a>
 
-      <a class="tarjeta-menu" href="/chat.html">
+      <a class="tarjeta-menu" href="/chat.html" id="tarjetaChat">
+        <span id="badgeChatNoLeidos" class="tarjeta-badge-no-leidos" hidden></span>
         <span class="tarjeta-icono">💬</span>
-        <span class="tarjeta-titulo">Chat</span>
+        <span class="tarjeta-titulo" id="tituloChat">Chat</span>
         <span class="tarjeta-desc">Mensajes internos entre compañeros</span>
       </a>
 
@@ -118,6 +119,67 @@
     }
 
     cargarCumples();
+
+    let noLeidosChatPrevio = 0;
+    let primeraCargaNoLeidosChat = true;
+    let intervaloNoLeidosChat = null;
+
+    function reproducirBeep() {
+      try {
+        const contexto = new (window.AudioContext || window.webkitAudioContext)();
+        const oscilador = contexto.createOscillator();
+        const volumen = contexto.createGain();
+        oscilador.frequency.value = 880;
+        volumen.gain.setValueAtTime(0.15, contexto.currentTime);
+        volumen.gain.exponentialRampToValueAtTime(0.001, contexto.currentTime + 0.25);
+        oscilador.connect(volumen).connect(contexto.destination);
+        oscilador.start();
+        oscilador.stop(contexto.currentTime + 0.25);
+      } catch (error) {
+        // Si el navegador todavía no permite audio (sin interacción previa
+        // del usuario), no rompemos nada: simplemente no suena.
+      }
+    }
+
+    async function cargarNoLeidosChat() {
+      try {
+        const respuesta = await fetch("/api/chat/conversaciones");
+        if (!respuesta.ok) return;
+        const conversaciones = await respuesta.json();
+        const total = conversaciones.reduce((suma, c) => suma + (c.no_leidos || 0), 0);
+
+        const badge = document.getElementById("badgeChatNoLeidos");
+        const titulo = document.getElementById("tituloChat");
+        badge.hidden = total === 0;
+        titulo.classList.toggle("tiene-no-leidos", total > 0);
+        if (total > 0) badge.textContent = total > 9 ? "9+" : total;
+
+        // No avisamos en la primerísima carga: si ya tenías mensajes sin
+        // leer de antes, no tiene sentido que suene apenas entrás.
+        if (!primeraCargaNoLeidosChat && total > noLeidosChatPrevio) reproducirBeep();
+        noLeidosChatPrevio = total;
+        primeraCargaNoLeidosChat = false;
+      } catch (error) {
+        // Si falla, la tarjeta de Chat queda como siempre, sin badge.
+      }
+    }
+
+    function iniciarPollingNoLeidosChat() {
+      if (intervaloNoLeidosChat) clearInterval(intervaloNoLeidosChat);
+      intervaloNoLeidosChat = setInterval(cargarNoLeidosChat, 3000);
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        if (intervaloNoLeidosChat) clearInterval(intervaloNoLeidosChat);
+      } else {
+        cargarNoLeidosChat();
+        iniciarPollingNoLeidosChat();
+      }
+    });
+
+    cargarNoLeidosChat();
+    iniciarPollingNoLeidosChat();
   </script>
 </body>
 </html>

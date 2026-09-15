@@ -257,6 +257,7 @@ main {
 }
 
 .tarjeta-menu {
+  position: relative;
   background: var(--superficie);
   border-radius: var(--radio);
   padding: 1.6rem 1.1rem;
@@ -284,7 +285,25 @@ main {
 
 .tarjeta-titulo { font-weight: 600; }
 
+.tarjeta-titulo.tiene-no-leidos { color: var(--verde); }
+
 .tarjeta-desc { font-size: 0.8rem; color: var(--texto-secundario); }
+
+.tarjeta-badge-no-leidos {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  background: #e0483f;
+  color: white;
+  font-size: 0.72rem;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0.3rem 0.45rem;
+  border-radius: 10px;
+  min-width: 1.1rem;
+  text-align: center;
+  box-shadow: var(--sombra);
+}
 
 .tarjeta-proximamente {
   opacity: 0.55;
