@@ -165,6 +165,27 @@
       ]
     },
     {
+      "nombre": "Ahorro Especial",
+      "preguntas": [
+        {
+          "pregunta": "¿Cómo realizar la apertura de cuenta y movimientos de Ahorro Especial?",
+          "respuesta": "Para realizar la apertura de cuenta, los integrantes deben ser asociados y tener el perfil actualizado. Ingresar en: Sistemas → Ahorro Especial → Cuentas → Mantenimiento.\n\nLuego ir a la pestaña de Movimientos Diarios, seleccionar la cuenta, indicar si es depósito o retiro e ingresar el monto. Para depósitos el monto es indefinido. Para retiro solo se puede el 25% del capital inicial con un tope de $300.000, como en CA común."
+        },
+        {
+          "pregunta": "¿Cómo realizar el proceso diario de Ahorro Especial?",
+          "respuesta": "El proceso diario de Ahorro Especial: primero sacar los comprobantes con totales donde se ve si hay ingresos o egresos; no siempre se tienen los comprobantes de caja, ya que como sucede en CA común no se imprimen.\n\nIngresar en: Sistemas → Ahorro Especial → Comprobantes para caja.\n\nLuego correr el proceso diario: Sistemas → Ahorro Especial → Procesos → Proceso Diario."
+        },
+        {
+          "pregunta": "¿Cómo realizar el proceso mensual de Ahorro Especial?",
+          "respuesta": "Ingresar en: Sistemas → Ahorro Especial → Procesos → Proceso Mensual."
+        },
+        {
+          "pregunta": "¿Cómo cargar los movimientos diarios de Ahorro Especial?",
+          "respuesta": "Ingresar en: Sistemas → Ahorro Especial → Movimientos Diarios.\n\nPermite cargar depósitos y retiros de cuentas de Ahorro Especial, vinculando el movimiento a la Caja de Ahorro del asociado."
+        }
+      ]
+    },
+    {
       "nombre": "Valores al Cobro",
       "preguntas": [
         {
