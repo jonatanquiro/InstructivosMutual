@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Chat — Información Mutual</title>
+  <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
+  <script>
+    (function () {
+      var t = localStorage.getItem("tema");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-izq">
+      <img src="/img/logo-blanco.png" alt="Logo Mutual" class="logo-barra" />
+      <h1>Chat</h1>
+      <span class="saludo" id="saludo"></span>
+    </div>
+  </header>
+
+  <main class="main-chat-app">
+    <p class="chat-app-aviso">Los mensajes se borran automáticamente a las 48hs.</p>
+
+    <div class="chat-app">
+      <aside class="chat-lista">
+        <div class="chat-lista-header">
+          <span>Conversaciones</span>
+          <button type="button" id="btnNuevoChat" class="btn-nuevo-chat" title="Nuevo chat privado">+ Nuevo</button>
+        </div>
+        <div id="pickerUsuarios" class="chat-picker-usuarios" hidden></div>
+        <div id="listaConversaciones" class="chat-lista-items"></div>
+      </aside>
+
+      <section class="chat-panel">
+        <div class="chat-panel-header" id="chatPanelHeader">Elegí una conversación</div>
+        <div class="chat-mensajes" id="chatMensajes"></div>
+        <form id="formEnviar" class="chat-form-envio">
+          <label class="chat-btn-adjuntar" title="Adjuntar imagen">
+            📎
+            <input type="file" id="inputImagen" accept="image/jpeg,image/png,image/webp,image/gif" hidden />
+          </label>
+          <span id="nombreImagenElegida" class="chat-nombre-imagen" hidden></span>
+          <input type="text" id="inputTexto" class="chat-input-texto" placeholder="Escribí un mensaje…" autocomplete="off" />
+          <button type="submit" class="btn-inferior principal">Enviar</button>
+        </form>
+      </section>
+    </div>
+  </main>
+
+  <footer class="barra-inferior">
+    <a href="/" class="btn-inferior principal">⌂ Menú principal</a>
+    <button id="btnSalir" class="btn-inferior peligro">Cerrar sesión</button>
+  </footer>
+
+  <script src="/comun.js"></script>
+  <script>
+    let usuarioId = null;
+    let conversaciones = [];
+    let conversacionActualId = null;
+    let ultimoMensajeId = 0;
+    let intervaloMensajes = null;
+    let intervaloConversaciones = null;
+
+    const listaConversaciones = document.getElementById("listaConversaciones");
+    const chatMensajes = document.getElementById("chatMensajes");
+    const chatPanelHeader = document.getElementById("chatPanelHeader");
+    const formEnviar = document.getElementById("formEnviar");
+    const inputTexto = document.getElementById("inputTexto");
+    const inputImagen = document.getElementById("inputImagen");
+    const nombreImagenElegida = document.getElementById("nombreImagenElegida");
+    const btnNuevoChat = document.getElementById("btnNuevoChat");
+    const pickerUsuarios = document.getElementById("pickerUsuarios");
+
+    function tituloConversacion(conversacion) {
+      return conversacion.tipo === "grupal" ? conversacion.nombre : conversacion.otro_nombre_completo;
+    }
+
+    function previewConversacion(conversacion) {
+      if (conversacion.ultimo_texto) return conversacion.ultimo_texto;
+      if (conversacion.ultimo_imagen_archivo) return "📷 Imagen";
+      return "Sin mensajes todavía";
+    }
+
+    function pintarListaConversaciones() {
+      listaConversaciones.innerHTML = "";
+      for (const conversacion of conversaciones) {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "chat-item-conversacion" + (conversacion.id === conversacionActualId ? " activa" : "");
+        item.innerHTML = `
+          <span class="chat-item-titulo">${tituloConversacion(conversacion)}</span>
+          <span class="chat-item-preview">${previewConversacion(conversacion)}</span>
+        `;
+        item.addEventListener("click", () => abrirConversacion(conversacion.id));
+        listaConversaciones.appendChild(item);
+      }
+    }
+
+    async function cargarConversaciones() {
+      const respuesta = await fetch("/api/chat/conversaciones");
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      conversaciones = await respuesta.json();
+      pintarListaConversaciones();
+    }
+
+    function scrollAbajo() {
+      chatMensajes.scrollTop = chatMensajes.scrollHeight;
+    }
+
+    function agregarMensaje(mensaje) {
+      const burbuja = document.createElement("div");
+      const esPropio = mensaje.usuario_id === usuarioId;
+      burbuja.className = "burbuja " + (esPropio ? "burbuja-usuario" : "burbuja-bot");
+
+      const autor = document.createElement("div");
+      autor.className = "chat-autor";
+      autor.textContent = esPropio ? "Vos" : mensaje.nombre_completo;
+      burbuja.appendChild(autor);
+
+      if (mensaje.texto) {
+        const texto = document.createElement("div");
+        texto.style.whiteSpace = "pre-wrap";
+        texto.textContent = mensaje.texto;
+        burbuja.appendChild(texto);
+      }
+
+      if (mensaje.imagen_archivo) {
+        const enlace = document.createElement("a");
+        enlace.href = `/uploads/chat/${mensaje.imagen_archivo}`;
+        enlace.target = "_blank";
+        enlace.rel = "noopener";
+        const imagen = document.createElement("img");
+        imagen.src = `/uploads/chat/${mensaje.imagen_archivo}`;
+        imagen.className = "chat-imagen-mensaje";
+        enlace.appendChild(imagen);
+        burbuja.appendChild(enlace);
+      }
+
+      chatMensajes.appendChild(burbuja);
+      ultimoMensajeId = Math.max(ultimoMensajeId, mensaje.id);
+    }
+
+    async function abrirConversacion(id) {
+      conversacionActualId = id;
+      ultimoMensajeId = 0;
+      chatMensajes.innerHTML = "";
+      const conversacion = conversaciones.find((c) => c.id === id);
+      chatPanelHeader.textContent = conversacion ? tituloConversacion(conversacion) : "";
+      pintarListaConversaciones();
+
+      const respuesta = await fetch(`/api/chat/conversaciones/${id}/mensajes`);
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      const mensajes = await respuesta.json();
+      mensajes.forEach(agregarMensaje);
+      scrollAbajo();
+
+      reiniciarPollingMensajes();
+    }
+
+    async function revisarMensajesNuevos() {
+      if (!conversacionActualId) return;
+      const respuesta = await fetch(`/api/chat/conversaciones/${conversacionActualId}/mensajes?despuesDe=${ultimoMensajeId}`);
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      const mensajes = await respuesta.json();
+      if (mensajes.length > 0) {
+        mensajes.forEach(agregarMensaje);
+        scrollAbajo();
+      }
+    }
+
+    function reiniciarPollingMensajes() {
+      if (intervaloMensajes) clearInterval(intervaloMensajes);
+      intervaloMensajes = setInterval(revisarMensajesNuevos, 3000);
+    }
+
+    inputImagen.addEventListener("change", () => {
+      const archivo = inputImagen.files[0];
+      if (archivo) {
+        nombreImagenElegida.textContent = archivo.name + " ✕";
+        nombreImagenElegida.hidden = false;
+      } else {
+        nombreImagenElegida.hidden = true;
+      }
+    });
+
+    nombreImagenElegida.addEventListener("click", () => {
+      inputImagen.value = "";
+      nombreImagenElegida.hidden = true;
+    });
+
+    formEnviar.addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      if (!conversacionActualId) return;
+
+      const texto = inputTexto.value.trim();
+      const archivo = inputImagen.files[0];
+      if (!texto && !archivo) return;
+
+      const datos = new FormData();
+      if (texto) datos.append("texto", texto);
+      if (archivo) datos.append("imagen", archivo);
+
+      const respuesta = await fetch(`/api/chat/conversaciones/${conversacionActualId}/mensajes`, {
+        method: "POST",
+        body: datos,
+      });
+
+      if (respuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      if (!respuesta.ok) {
+        const error = await respuesta.json().catch(() => ({}));
+        alert(error.error || "No se pudo enviar el mensaje");
+        return;
+      }
+
+      const mensaje = await respuesta.json();
+      agregarMensaje(mensaje);
+      scrollAbajo();
+      inputTexto.value = "";
+      inputImagen.value = "";
+      nombreImagenElegida.hidden = true;
+      cargarConversaciones();
+    });
+
+    btnNuevoChat.addEventListener("click", async () => {
+      if (!pickerUsuarios.hidden) {
+        pickerUsuarios.hidden = true;
+        return;
+      }
+      const respuesta = await fetch("/api/chat/usuarios");
+      const usuarios = await respuesta.json();
+      pickerUsuarios.innerHTML = "";
+      if (usuarios.length === 0) {
+        pickerUsuarios.innerHTML = "<div class='chat-picker-vacio'>No hay otros usuarios activos</div>";
+      }
+      for (const usuario of usuarios) {
+        const item = document.createElement("button");
+        item.type = "button";
+        item.className = "chat-picker-item";
+        item.textContent = usuario.nombre_completo;
+        item.addEventListener("click", async () => {
+          pickerUsuarios.hidden = true;
+          const creacion = await fetch("/api/chat/conversaciones", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ usuarioId: usuario.id }),
+          });
+          const datos = await creacion.json();
+          await cargarConversaciones();
+          abrirConversacion(datos.id);
+        });
+        pickerUsuarios.appendChild(item);
+      }
+      pickerUsuarios.hidden = false;
+    });
+
+    async function iniciar() {
+      const meRespuesta = await fetch("/api/auth/me");
+      if (meRespuesta.status === 401) {
+        window.location.href = "/login.html";
+        return;
+      }
+      const me = await meRespuesta.json();
+      usuarioId = me.usuarioId;
+
+      await cargarConversaciones();
+
+      const grupal = conversaciones.find((c) => c.tipo === "grupal");
+      if (grupal) abrirConversacion(grupal.id);
+
+      intervaloConversaciones = setInterval(cargarConversaciones, 10000);
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (document.visibilityState === "hidden") {
+        if (intervaloMensajes) clearInterval(intervaloMensajes);
+        if (intervaloConversaciones) clearInterval(intervaloConversaciones);
+      } else {
+        if (conversacionActualId) reiniciarPollingMensajes();
+        intervaloConversaciones = setInterval(cargarConversaciones, 10000);
+      }
+    });
+
+    iniciar();
+  </script>
+</body>
+</html>

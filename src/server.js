@@ -1,4 +1,5 @@
 require("dotenv").config();
+const fs = require("fs");
 const path = require("path");
 const express = require("express");
 const session = require("express-session");
@@ -12,6 +13,8 @@ const cumpleaniosRoutes = require("./routes/cumpleanios.routes");
 const usuariosRoutes = require("./routes/usuarios.routes");
 const configRoutes = require("./routes/config.routes");
 const bcraRoutes = require("./routes/bcra.routes");
+const chatRoutes = require("./routes/chat.routes");
+const { limpiarMensajesViejos } = require("./jobs/limpieza-chat");
 
 const app = express();
 
@@ -29,14 +32,30 @@ app.use(
 );
 
 // login.html queda accesible sin sesión; el resto de /api requiere login.
+//
+// OJO con el orden: "app.use(path, mw1, mw2, router)" registra mw1 y mw2
+// para CUALQUIER request que matchee "path", no solo para las rutas que
+// después matcheen dentro de "router". Por eso todas las rutas que debe
+// poder usar cualquier logueado (no solo admins) van montadas ANTES que
+// las rutas con requiereAdmin: si no, una request a, por ejemplo,
+// /api/bcra/... quedaría cortada por el requiereAdmin de usuariosRoutes
+// antes de llegar siquiera a bcraRoutes.
 app.use("/api/auth", authRoutes);
 app.use("/api", requiereLogin, faqRoutes);
 app.use("/api", requiereLogin, cumpleaniosRoutes);
+app.use("/api", requiereLogin, configRoutes);
+app.use("/api", requiereLogin, bcraRoutes);
+app.use("/api", requiereLogin, chatRoutes);
 app.use("/api", requiereLogin, requiereAdmin, usuariosRoutes);
 app.use("/api", requiereLogin, requiereAdmin, faqAdminRoutes);
-app.use("/api", requiereLogin, configRoutes);
 app.use("/api", requiereLogin, requiereAdmin, estadisticasRoutes);
-app.use("/api", requiereLogin, bcraRoutes);
+
+// Carpeta donde se guardan las imágenes adjuntadas al chat. Se sirve detrás
+// de requiereLogin (antes del static general) porque son datos internos de
+// la mutual, no contenido público como /img.
+const CARPETA_UPLOADS_CHAT = path.join(__dirname, "uploads", "chat");
+fs.mkdirSync(CARPETA_UPLOADS_CHAT, { recursive: true });
+app.use("/uploads/chat", requiereLogin, express.static(CARPETA_UPLOADS_CHAT));
 
 // usuarios.html, faq-admin.html y proyectos.html son solo para admins. Se
 // definen ANTES del static middleware para interceptar el pedido y no
@@ -68,3 +87,8 @@ const PUERTO = process.env.PORT || 3000;
 app.listen(PUERTO, () => {
   console.log(`Servidor escuchando en http://localhost:${PUERTO}`);
 });
+
+// Limpieza de mensajes de chat viejos: una vez al arrancar y después cada
+// 30 minutos. El chat es para coordinación de corto plazo, no historial.
+limpiarMensajesViejos();
+setInterval(limpiarMensajesViejos, 30 * 60 * 1000);

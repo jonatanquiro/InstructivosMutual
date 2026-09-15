@@ -66,6 +66,7 @@ router.get("/me", (req, res) => {
     return res.status(401).json({ error: "No autenticado" });
   }
   res.json({
+    usuarioId: req.session.usuarioId,
     nombreCompleto: req.session.nombreCompleto,
     rol: req.session.rol,
   });

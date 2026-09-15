@@ -65,3 +65,40 @@ CREATE TABLE app_consultas_log (
     fecha         DATETIME NOT NULL DEFAULT GETDATE()
 );
 GO
+
+-- Chat interno: canal grupal "General" + conversaciones privadas 1 a 1,
+-- con adjuntos de imagen. Los mensajes se purgan solos a las 48hs desde el
+-- job de limpieza del servidor (src/jobs/limpieza-chat.js).
+IF OBJECT_ID('app_chat_mensajes', 'U') IS NOT NULL DROP TABLE app_chat_mensajes;
+IF OBJECT_ID('app_chat_participantes', 'U') IS NOT NULL DROP TABLE app_chat_participantes;
+IF OBJECT_ID('app_chat_conversaciones', 'U') IS NOT NULL DROP TABLE app_chat_conversaciones;
+GO
+
+CREATE TABLE app_chat_conversaciones (
+    id             INT IDENTITY(1,1) PRIMARY KEY,
+    tipo           NVARCHAR(10) NOT NULL,   -- 'grupal' | 'privada'
+    nombre         NVARCHAR(150) NULL,      -- solo para 'grupal'
+    fecha_creacion DATETIME NOT NULL DEFAULT GETDATE()
+);
+GO
+
+CREATE TABLE app_chat_participantes (
+    conversacion_id INT NOT NULL FOREIGN KEY REFERENCES app_chat_conversaciones(id),
+    usuario_id      INT NOT NULL FOREIGN KEY REFERENCES app_usuarios(id),
+    PRIMARY KEY (conversacion_id, usuario_id)
+);
+GO
+
+CREATE TABLE app_chat_mensajes (
+    id              INT IDENTITY(1,1) PRIMARY KEY,
+    conversacion_id INT NOT NULL FOREIGN KEY REFERENCES app_chat_conversaciones(id),
+    usuario_id      INT NOT NULL FOREIGN KEY REFERENCES app_usuarios(id),
+    texto           NVARCHAR(2000) NULL,
+    imagen_archivo  NVARCHAR(300) NULL,
+    fecha           DATETIME NOT NULL DEFAULT GETDATE()
+);
+CREATE INDEX IX_chat_mensajes_conversacion ON app_chat_mensajes(conversacion_id, fecha);
+GO
+
+INSERT INTO app_chat_conversaciones (tipo, nombre) VALUES ('grupal', 'General');
+GO
