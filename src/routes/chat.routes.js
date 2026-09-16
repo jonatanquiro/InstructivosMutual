@@ -6,6 +6,8 @@ const multer = require("multer");
 const { sql, getPool } = require("../config/db");
 const { cifrarTexto, descifrarTexto } = require("../config/cifrado");
 const { estaEnLinea } = require("../config/presencia");
+const { verificarAcceso, marcarLeido, obtenerLecturasDeOtros } = require("./chat-datos");
+const { emitirAConversacion, emitirAUsuario, unirUsuarioAConversacion } = require("../config/socket");
 
 const router = express.Router();
 
@@ -35,67 +37,20 @@ const upload = multer({
   },
 });
 
-// Confirma que el usuario logueado puede leer/escribir en la conversación:
-// la grupal es libre para cualquier logueado, las privadas requieren ser
-// participante. Devuelve la fila de la conversación o null si no existe.
-async function verificarAcceso(pool, conversacionId, usuarioId) {
-  const resultado = await pool
-    .request()
-    .input("id", sql.Int, conversacionId)
-    .query("SELECT id, tipo FROM app_chat_conversaciones WHERE id = @id");
+// verificarAcceso/marcarLeido/obtenerLecturasDeOtros viven en chat-datos.js
+// (no acá) para que config/socket.js las pueda usar también sin quedar una
+// dependencia circular entre ese módulo y este.
 
-  const conversacion = resultado.recordset[0];
-  if (!conversacion) return null;
-
-  if (conversacion.tipo === "grupal") return conversacion;
-
-  const participante = await pool
-    .request()
-    .input("conversacionId", sql.Int, conversacionId)
-    .input("usuarioId", sql.Int, usuarioId)
-    .query(`
-      SELECT 1 FROM app_chat_participantes
-      WHERE conversacion_id = @conversacionId AND usuario_id = @usuarioId
-    `);
-
-  return participante.recordset.length > 0 ? conversacion : false;
-}
-
-// Marca que un usuario leyó una conversación hasta cierto mensaje (se usa
-// tanto al pedir mensajes como al mandar uno: mandar también es "leer").
-async function marcarLeido(pool, conversacionId, usuarioId, mensajeId) {
-  await pool
-    .request()
-    .input("conversacionId", sql.Int, conversacionId)
-    .input("usuarioId", sql.Int, usuarioId)
-    .input("ultimoMensajeId", sql.Int, mensajeId)
-    .query(`
-      MERGE app_chat_lecturas AS destino
-      USING (SELECT @conversacionId AS conversacion_id, @usuarioId AS usuario_id) AS origen
-        ON destino.conversacion_id = origen.conversacion_id AND destino.usuario_id = origen.usuario_id
-      WHEN MATCHED THEN
-        UPDATE SET ultimo_mensaje_id = @ultimoMensajeId
-      WHEN NOT MATCHED THEN
-        INSERT (conversacion_id, usuario_id, ultimo_mensaje_id)
-        VALUES (@conversacionId, @usuarioId, @ultimoMensajeId);
-    `);
-}
-
-// Hasta qué mensaje leyó cada uno de los OTROS participantes (todos menos
-// el que pregunta). Se usa para calcular "visto" en los mensajes propios.
-async function obtenerLecturasDeOtros(pool, conversacionId, usuarioId) {
-  const otros = await pool
-    .request()
-    .input("conversacionId", sql.Int, conversacionId)
-    .input("usuarioId", sql.Int, usuarioId)
-    .query(`
-      SELECT p.usuario_id, COALESCE(l.ultimo_mensaje_id, 0) AS ultimo_mensaje_id
-      FROM app_chat_participantes p
-      LEFT JOIN app_chat_lecturas l
-        ON l.conversacion_id = p.conversacion_id AND l.usuario_id = p.usuario_id
-      WHERE p.conversacion_id = @conversacionId AND p.usuario_id <> @usuarioId
-    `);
-  return otros.recordset;
+// Además de marcar el mensaje como leído en la base, avisa por socket a los
+// demás participantes para que el doble check (✓✓) del remitente se
+// actualice al instante en vez de esperar al próximo sondeo.
+async function marcarLeidoYAvisar(pool, conversacionId, usuarioId, mensajeId) {
+  await marcarLeido(pool, conversacionId, usuarioId, mensajeId);
+  emitirAConversacion(conversacionId, "lecturaActualizada", {
+    conversacionId,
+    usuarioId,
+    ultimoMensajeId: mensajeId,
+  });
 }
 
 // Lista la conversación grupal + las privadas/grupos del usuario, con el
@@ -113,6 +68,7 @@ router.get("/chat/conversaciones", async (req, res) => {
           c.id, c.tipo, c.nombre,
           otro.usuario_id AS otro_usuario_id,
           otro.nombre_completo AS otro_nombre_completo,
+          otro.foto_archivo AS otro_foto_archivo,
           ultimo.texto AS ultimo_texto,
           ultimo.imagen_archivo AS ultimo_imagen_archivo,
           ultimo.fecha AS ultima_fecha,
@@ -131,9 +87,10 @@ router.get("/chat/conversaciones", async (req, res) => {
         -- un grupo hay varios, así que este OUTER APPLY (a diferencia de un
         -- JOIN plano) devuelve como mucho 1 fila y no duplica la conversación.
         OUTER APPLY (
-          SELECT TOP 1 p.usuario_id, u.nombre_completo
+          SELECT TOP 1 p.usuario_id, u.nombre_completo, cfg.foto_archivo
           FROM app_chat_participantes p
           JOIN app_usuarios u ON u.id = p.usuario_id
+          LEFT JOIN app_config_usuario cfg ON cfg.usuario_id = p.usuario_id
           WHERE p.conversacion_id = c.id AND p.usuario_id <> @usuarioId AND c.tipo = 'privada'
         ) otro
         OUTER APPLY (
@@ -178,6 +135,7 @@ router.get("/chat/conversaciones", async (req, res) => {
 
       if (fila.tipo === "privada") {
         base.otro_en_linea = fila.otro_usuario_id ? estaEnLinea(fila.otro_usuario_id) : false;
+        base.otro_foto_url = fila.otro_foto_archivo ? `/uploads/perfiles/${fila.otro_foto_archivo}` : null;
       } else if (fila.tipo === "grupo") {
         const participantes = participantesPorGrupo.get(fila.id) || [];
         base.total_participantes = participantes.length;
@@ -228,6 +186,18 @@ router.post("/chat/grupos", async (req, res) => {
         .query("INSERT INTO app_chat_participantes (conversacion_id, usuario_id) VALUES (@conversacionId, @usuarioId)");
     }
 
+    // A los demás participantes (no a quien lo crea, que ya lo sabe por la
+    // respuesta de este mismo request) se les avisa por socket para que el
+    // grupo nuevo aparezca en su lista sin esperar el próximo sondeo, y se
+    // suman sus sockets ya conectados a la sala de esta conversación para
+    // que les lleguen los mensajes en tiempo real desde el primer momento.
+    for (const idParticipante of todosLosIds) {
+      unirUsuarioAConversacion(idParticipante, conversacionId);
+      if (idParticipante !== usuarioId) {
+        emitirAUsuario(idParticipante, "conversacionNueva", { id: conversacionId });
+      }
+    }
+
     res.status(201).json({ id: conversacionId });
   } catch (error) {
     console.error("Error creando grupo de chat:", error);
@@ -244,14 +214,17 @@ router.get("/chat/usuarios", async (req, res) => {
       .request()
       .input("usuarioId", sql.Int, req.session.usuarioId)
       .query(`
-        SELECT id, nombre_completo
-        FROM app_usuarios
-        WHERE activo = 1 AND id <> @usuarioId
-        ORDER BY nombre_completo
+        SELECT u.id, u.nombre_completo, cfg.foto_archivo
+        FROM app_usuarios u
+        LEFT JOIN app_config_usuario cfg ON cfg.usuario_id = u.id
+        WHERE u.activo = 1 AND u.id <> @usuarioId
+        ORDER BY u.nombre_completo
       `);
     const usuarios = resultado.recordset.map((fila) => ({
-      ...fila,
+      id: fila.id,
+      nombre_completo: fila.nombre_completo,
       en_linea: estaEnLinea(fila.id),
+      foto_url: fila.foto_archivo ? `/uploads/perfiles/${fila.foto_archivo}` : null,
     }));
     res.json(usuarios);
   } catch (error) {
@@ -303,6 +276,10 @@ router.post("/chat/conversaciones", async (req, res) => {
         VALUES (@conversacionId, @usuarioId), (@conversacionId, @otroUsuarioId)
       `);
 
+    unirUsuarioAConversacion(usuarioId, conversacionId);
+    unirUsuarioAConversacion(otroUsuarioId, conversacionId);
+    emitirAUsuario(otroUsuarioId, "conversacionNueva", { id: conversacionId });
+
     res.status(201).json({ id: conversacionId });
   } catch (error) {
     console.error("Error creando conversación de chat:", error);
@@ -331,9 +308,11 @@ router.get("/chat/conversaciones/:id/mensajes", async (req, res) => {
       .input("despuesDe", sql.Int, despuesDe)
       .query(`
         SELECT * FROM (
-          SELECT TOP 50 m.id, m.usuario_id, u.nombre_completo, m.texto, m.imagen_archivo, m.fecha
+          SELECT TOP 50 m.id, m.usuario_id, u.nombre_completo, cfg.foto_archivo,
+            m.texto, m.imagen_archivo, m.fecha
           FROM app_chat_mensajes m
           JOIN app_usuarios u ON u.id = m.usuario_id
+          LEFT JOIN app_config_usuario cfg ON cfg.usuario_id = m.usuario_id
           WHERE m.conversacion_id = @conversacionId AND m.id > @despuesDe
           ORDER BY m.id DESC
         ) recientes
@@ -344,7 +323,7 @@ router.get("/chat/conversaciones/:id/mensajes", async (req, res) => {
     // mensaje que se le mostró al usuario.
     const maxIdMostrado = resultado.recordset.reduce((max, m) => Math.max(max, m.id), 0);
     if (maxIdMostrado > 0) {
-      await marcarLeido(pool, conversacionId, usuarioId, maxIdMostrado);
+      await marcarLeidoYAvisar(pool, conversacionId, usuarioId, maxIdMostrado);
     }
 
     // "Visto" (doble check) solo tiene sentido en DM/grupo: hay que ver si
@@ -354,7 +333,11 @@ router.get("/chat/conversaciones/:id/mensajes", async (req, res) => {
       acceso.tipo !== "grupal" ? await obtenerLecturasDeOtros(pool, conversacionId, usuarioId) : [];
 
     const mensajes = resultado.recordset.map((fila) => {
-      const base = { ...fila, texto: descifrarTexto(fila.texto) };
+      const base = {
+        ...fila,
+        texto: descifrarTexto(fila.texto),
+        foto_url: fila.foto_archivo ? `/uploads/perfiles/${fila.foto_archivo}` : null,
+      };
       if (fila.usuario_id === usuarioId && lecturasDeOtros.length > 0) {
         base.visto = lecturasDeOtros.every((otro) => otro.ultimo_mensaje_id >= fila.id);
       }
@@ -419,16 +402,36 @@ router.post("/chat/conversaciones/:id/mensajes", upload.single("imagen"), async 
 
     // Mandar un mensaje también cuenta como "haberlo leído": si no, el
     // propio remitente vería su mensaje recién enviado como no leído.
-    await marcarLeido(pool, conversacionId, req.session.usuarioId, nuevoId);
+    await marcarLeidoYAvisar(pool, conversacionId, req.session.usuarioId, nuevoId);
 
-    res.status(201).json({
-      id: resultado.recordset[0].id,
+    // La foto no viaja en la sesión (podría cambiar sin re-loguearse), así
+    // que se busca acá para que los demás participantes la vean en su
+    // avatar del mensaje sin tener que pedir el perfil de este usuario aparte.
+    const perfilRemitente = await pool
+      .request()
+      .input("usuarioId", sql.Int, req.session.usuarioId)
+      .query("SELECT foto_archivo FROM app_config_usuario WHERE usuario_id = @usuarioId");
+    const fotoArchivo = perfilRemitente.recordset[0]?.foto_archivo;
+
+    // Mismo objeto para la respuesta HTTP (quien mandó el mensaje) y para
+    // el aviso por socket a los demás participantes de la conversación:
+    // así no hay dos formatos de "mensaje" distintos dando vueltas. El
+    // check de "visto" solo se agrega fuera de "General" (mismo criterio
+    // que en GET /mensajes): con muchos participantes no aporta nada.
+    const mensaje = {
+      id: nuevoId,
+      conversacion_id: conversacionId,
       usuario_id: req.session.usuarioId,
       nombre_completo: req.session.nombreCompleto,
+      foto_url: fotoArchivo ? `/uploads/perfiles/${fotoArchivo}` : null,
       texto: texto || null,
       imagen_archivo: req.file ? req.file.filename : null,
       fecha: resultado.recordset[0].fecha,
-    });
+    };
+    if (acceso.tipo !== "grupal") mensaje.visto = false;
+    emitirAConversacion(conversacionId, "mensajeNuevo", mensaje);
+
+    res.status(201).json(mensaje);
   } catch (error) {
     console.error("Error enviando mensaje de chat:", error);
     res.status(500).json({ error: "Error de servidor" });

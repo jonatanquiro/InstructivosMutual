@@ -4,10 +4,12 @@
 require("dotenv").config({ path: process.env.ENV_FILE || ".env" });
 const fs = require("fs");
 const path = require("path");
+const http = require("http");
 const express = require("express");
 const session = require("express-session");
 
 const { requiereLogin, requiereAdmin } = require("./middleware/auth");
+const { inicializar: inicializarSocket } = require("./config/socket");
 const authRoutes = require("./routes/auth.routes");
 const faqRoutes = require("./routes/faq.routes");
 const faqAdminRoutes = require("./routes/faq-admin.routes");
@@ -22,21 +24,24 @@ const app = express();
 
 app.use(express.json());
 
-app.use(
-  session({
-    // Nombre de cookie distinto en test (SESSION_COOKIE_NAME en .env.test):
-    // los navegadores comparten cookies entre puertos del mismo host, así
-    // que sin esto loguearte en el testeo (3001) pisaría la sesión de
-    // producción (3000) si los probás desde el mismo navegador.
-    name: process.env.SESSION_COOKIE_NAME || "connect.sid",
-    secret: process.env.SESSION_SECRET || "cambiar-este-secreto-en-produccion",
-    resave: false,
-    saveUninitialized: false,
-    // Sin maxAge: cookie de sesión de navegador. Se borra al cerrar el
-    // navegador, así que si el usuario sale de la página tiene que volver
-    // a loguearse, en vez de quedar con sesión abierta por horas.
-  })
-);
+// Se guarda en una variable (en vez de pasarla inline a app.use) porque el
+// módulo de sockets (config/socket.js) necesita la MISMA instancia para
+// poder leer la sesión de cada conexión por WebSocket.
+const sessionMiddleware = session({
+  // Nombre de cookie distinto en test (SESSION_COOKIE_NAME en .env.test):
+  // los navegadores comparten cookies entre puertos del mismo host, así
+  // que sin esto loguearte en el testeo (3001) pisaría la sesión de
+  // producción (3000) si los probás desde el mismo navegador.
+  name: process.env.SESSION_COOKIE_NAME || "connect.sid",
+  secret: process.env.SESSION_SECRET || "cambiar-este-secreto-en-produccion",
+  resave: false,
+  saveUninitialized: false,
+  // Sin maxAge: cookie de sesión de navegador. Se borra al cerrar el
+  // navegador, así que si el usuario sale de la página tiene que volver
+  // a loguearse, en vez de quedar con sesión abierta por horas.
+});
+
+app.use(sessionMiddleware);
 
 // login.html queda accesible sin sesión; el resto de /api requiere login.
 //
@@ -65,6 +70,11 @@ const CARPETA_UPLOADS_CHAT = path.join(__dirname, process.env.CHAT_UPLOADS_DIR |
 fs.mkdirSync(CARPETA_UPLOADS_CHAT, { recursive: true });
 app.use("/uploads/chat", requiereLogin, express.static(CARPETA_UPLOADS_CHAT));
 
+// Fotos de perfil: mismo criterio que las del chat (no son públicas).
+const CARPETA_UPLOADS_PERFILES = path.join(__dirname, process.env.PERFIL_UPLOADS_DIR || "uploads/perfiles");
+fs.mkdirSync(CARPETA_UPLOADS_PERFILES, { recursive: true });
+app.use("/uploads/perfiles", requiereLogin, express.static(CARPETA_UPLOADS_PERFILES));
+
 // usuarios.html, faq-admin.html y proyectos.html son solo para admins. Se
 // definen ANTES del static middleware para interceptar el pedido y no
 // dejar que se sirva el archivo sin control.
@@ -91,7 +101,14 @@ app.get("/", requiereLogin, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "index.html"));
 });
 
+// http.createServer(app) en vez de app.listen(...) directo: socket.io
+// necesita el server HTTP "de abajo" para poder atender también conexiones
+// WebSocket sobre el mismo puerto (así el chat recibe mensajes/vistos al
+// instante en vez de esperar al próximo sondeo del navegador).
+const servidorHttp = http.createServer(app);
+inicializarSocket(servidorHttp, sessionMiddleware);
+
 const PUERTO = process.env.PORT || 3000;
-app.listen(PUERTO, () => {
+servidorHttp.listen(PUERTO, () => {
   console.log(`Servidor escuchando en http://localhost:${PUERTO}`);
 });

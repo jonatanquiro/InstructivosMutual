@@ -35,6 +35,39 @@
         </div>
       </div>
     </div>
+
+    <div class="caja-config caja-config-perfil">
+      <strong class="caja-config-titulo">Datos personales</strong>
+
+      <div class="perfil-avatar-fila">
+        <div class="perfil-avatar" id="perfilAvatar">🙂</div>
+        <div class="perfil-avatar-botones">
+          <label class="btn-nuevo-chat perfil-btn-foto">
+            Cambiar foto
+            <input type="file" id="inputFotoPerfil" accept="image/jpeg,image/png,image/webp" hidden />
+          </label>
+          <button type="button" id="btnQuitarFoto" class="btn-nuevo-chat" hidden>Quitar foto</button>
+        </div>
+      </div>
+      <span class="perfil-ayuda">JPG, PNG o WEBP, máx. 2MB.</span>
+
+      <form id="formPerfil" class="perfil-campos">
+        <label class="perfil-campo">
+          <span>Teléfono</span>
+          <input type="tel" id="inputTelefono" placeholder="Ej: 3401 123456" maxlength="30" />
+        </label>
+        <label class="perfil-campo">
+          <span>Email</span>
+          <input type="email" id="inputEmail" placeholder="nombre@mutual.com.ar" maxlength="150" />
+        </label>
+        <label class="perfil-campo">
+          <span>Fecha de nacimiento</span>
+          <input type="date" id="inputFechaNacimiento" />
+        </label>
+        <button type="submit" class="btn-inferior principal perfil-btn-guardar">Guardar</button>
+        <span id="perfilMensaje" class="perfil-mensaje" hidden></span>
+      </form>
+    </div>
   </main>
 
   <footer class="barra-inferior">
@@ -45,6 +78,14 @@
   <script src="/comun.js"></script>
   <script>
     const botonesTema = [document.getElementById("btnTemaClaro"), document.getElementById("btnTemaOscuro")];
+    const perfilAvatar = document.getElementById("perfilAvatar");
+    const inputFotoPerfil = document.getElementById("inputFotoPerfil");
+    const btnQuitarFoto = document.getElementById("btnQuitarFoto");
+    const formPerfil = document.getElementById("formPerfil");
+    const inputTelefono = document.getElementById("inputTelefono");
+    const inputEmail = document.getElementById("inputEmail");
+    const inputFechaNacimiento = document.getElementById("inputFechaNacimiento");
+    const perfilMensaje = document.getElementById("perfilMensaje");
 
     function marcarTemaActivo(tema) {
       for (const boton of botonesTema) {
@@ -52,14 +93,28 @@
       }
     }
 
-    async function cargarTema() {
+    function pintarAvatar(fotoUrl) {
+      if (fotoUrl) {
+        perfilAvatar.innerHTML = `<img src="${fotoUrl}" alt="Foto de perfil" />`;
+        btnQuitarFoto.hidden = false;
+      } else {
+        perfilAvatar.textContent = "🙂";
+        btnQuitarFoto.hidden = true;
+      }
+    }
+
+    async function cargarConfiguracion() {
       try {
         const respuesta = await fetch("/api/config");
         if (!respuesta.ok) return;
-        const { tema } = await respuesta.json();
-        marcarTemaActivo(tema);
+        const datos = await respuesta.json();
+        marcarTemaActivo(datos.tema);
+        inputTelefono.value = datos.telefono || "";
+        inputEmail.value = datos.email || "";
+        inputFechaNacimiento.value = datos.fechaNacimiento || "";
+        pintarAvatar(datos.fotoUrl);
       } catch (error) {
-        // Se queda con lo que haya quedado marcado por defecto.
+        // Se queda con los defaults si falla.
       }
     }
 
@@ -75,11 +130,62 @@
       });
     }
 
+    function mostrarMensajePerfil(texto, esError) {
+      perfilMensaje.textContent = texto;
+      perfilMensaje.classList.toggle("error", !!esError);
+      perfilMensaje.hidden = false;
+      setTimeout(() => (perfilMensaje.hidden = true), 3000);
+    }
+
     for (const boton of botonesTema) {
       boton.addEventListener("click", () => elegirTema(boton.dataset.tema));
     }
 
-    cargarTema();
+    inputFotoPerfil.addEventListener("change", async () => {
+      const archivo = inputFotoPerfil.files[0];
+      if (!archivo) return;
+
+      const datos = new FormData();
+      datos.append("foto", archivo);
+      const respuesta = await fetch("/api/config/foto", { method: "POST", body: datos });
+      inputFotoPerfil.value = "";
+
+      if (!respuesta.ok) {
+        const error = await respuesta.json().catch(() => ({}));
+        mostrarMensajePerfil(error.error || "No se pudo subir la foto", true);
+        return;
+      }
+      const { fotoUrl } = await respuesta.json();
+      pintarAvatar(fotoUrl);
+      mostrarMensajePerfil("Foto actualizada");
+    });
+
+    btnQuitarFoto.addEventListener("click", async () => {
+      const respuesta = await fetch("/api/config/foto", { method: "DELETE" });
+      if (respuesta.ok) pintarAvatar(null);
+    });
+
+    formPerfil.addEventListener("submit", async (evento) => {
+      evento.preventDefault();
+      const respuesta = await fetch("/api/config/perfil", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          telefono: inputTelefono.value.trim(),
+          email: inputEmail.value.trim(),
+          fechaNacimiento: inputFechaNacimiento.value,
+        }),
+      });
+
+      if (!respuesta.ok) {
+        const error = await respuesta.json().catch(() => ({}));
+        mostrarMensajePerfil(error.error || "No se pudo guardar", true);
+        return;
+      }
+      mostrarMensajePerfil("Datos guardados");
+    });
+
+    cargarConfiguracion();
   </script>
 </body>
 </html>

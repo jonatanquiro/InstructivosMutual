@@ -30,6 +30,11 @@ npm run dev      # desarrollo, reinicia solo al guardar cambios
 
 El servidor levanta en el puerto definido en `.env` (por defecto `3000`).
 
+## Documentación
+
+- [Funcionamiento general de la app](docs/funcionamiento-general.md)
+- [Documentación técnica por carpetas](docs/documentacion-tecnica.md)
+
 ## Notas
 
 - `.env` nunca se sube a git (contiene credenciales).

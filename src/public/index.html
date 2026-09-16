@@ -80,6 +80,7 @@
   </footer>
 
   <script src="/comun.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
   <script>
     async function mostrarTarjetaUsuariosSiAdmin() {
       try {
@@ -123,6 +124,13 @@
     let noLeidosChatPrevio = 0;
     let primeraCargaNoLeidosChat = true;
     let intervaloNoLeidosChat = null;
+    const tituloOriginal = document.title;
+
+    // Título tipo "viejo Facebook": mientras haya no leídos, se ve el
+    // número en la pestaña aunque no se esté mirando esta pantalla.
+    function actualizarTituloNoLeidos(total) {
+      document.title = total > 0 ? `${tituloOriginal} (${total > 99 ? "99+" : total})` : tituloOriginal;
+    }
 
     function reproducirBeep() {
       try {
@@ -159,6 +167,7 @@
         if (!primeraCargaNoLeidosChat && total > noLeidosChatPrevio) reproducirBeep();
         noLeidosChatPrevio = total;
         primeraCargaNoLeidosChat = false;
+        actualizarTituloNoLeidos(total);
       } catch (error) {
         // Si falla, la tarjeta de Chat queda como siempre, sin badge.
       }
@@ -166,17 +175,22 @@
 
     function iniciarPollingNoLeidosChat() {
       if (intervaloNoLeidosChat) clearInterval(intervaloNoLeidosChat);
+      // Sondeo de respaldo nomás: el aviso "de verdad" llega por socket
+      // (más abajo) apenas se manda un mensaje, sin depender de este tick
+      // ni de que la pestaña esté en primer plano.
       intervaloNoLeidosChat = setInterval(cargarNoLeidosChat, 3000);
     }
 
     document.addEventListener("visibilitychange", () => {
-      if (document.hidden) {
-        if (intervaloNoLeidosChat) clearInterval(intervaloNoLeidosChat);
-      } else {
-        cargarNoLeidosChat();
-        iniciarPollingNoLeidosChat();
-      }
+      if (document.visibilityState === "visible") cargarNoLeidosChat();
     });
+
+    // No hace falta saber el usuarioId acá: el servidor identifica al
+    // usuario por la cookie de sesión al conectar el socket, y lo suma
+    // solo a las salas de sus propias conversaciones.
+    const socket = io();
+    socket.on("mensajeNuevo", cargarNoLeidosChat);
+    socket.on("conversacionNueva", cargarNoLeidosChat);
 
     cargarNoLeidosChat();
     iniciarPollingNoLeidosChat();

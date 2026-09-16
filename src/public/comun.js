@@ -30,9 +30,16 @@ document.addEventListener("DOMContentLoaded", () => {
     fetch("/api/auth/me")
       .then((r) => (r.ok ? r.json() : null))
       .then((datos) => {
-        if (datos && datos.nombreCompleto) {
-          saludoEl.textContent = `Hola, ${datos.nombreCompleto}`;
+        if (!datos || !datos.nombreCompleto) return;
+        saludoEl.innerHTML = "";
+        if (datos.fotoUrl) {
+          const avatar = document.createElement("img");
+          avatar.src = datos.fotoUrl;
+          avatar.alt = "";
+          avatar.className = "saludo-avatar";
+          saludoEl.appendChild(avatar);
         }
+        saludoEl.appendChild(document.createTextNode(`Hola, ${datos.nombreCompleto}`));
       })
       .catch(() => {});
   }

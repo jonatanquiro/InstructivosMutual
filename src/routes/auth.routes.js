@@ -61,15 +61,38 @@ router.post("/logout", (req, res) => {
   });
 });
 
-router.get("/me", (req, res) => {
+// La foto no viaja en la sesión (podría cambiar sin re-loguearse), por eso
+// esta ruta pasó de sync a async: hace falta ir a buscarla a la base.
+router.get("/me", async (req, res) => {
   if (!req.session.usuarioId) {
     return res.status(401).json({ error: "No autenticado" });
   }
-  res.json({
-    usuarioId: req.session.usuarioId,
-    nombreCompleto: req.session.nombreCompleto,
-    rol: req.session.rol,
-  });
+
+  try {
+    const pool = await getPool();
+    const resultado = await pool
+      .request()
+      .input("usuarioId", sql.Int, req.session.usuarioId)
+      .query("SELECT foto_archivo FROM app_config_usuario WHERE usuario_id = @usuarioId");
+
+    const fotoArchivo = resultado.recordset[0]?.foto_archivo;
+    res.json({
+      usuarioId: req.session.usuarioId,
+      nombreCompleto: req.session.nombreCompleto,
+      rol: req.session.rol,
+      fotoUrl: fotoArchivo ? `/uploads/perfiles/${fotoArchivo}` : null,
+    });
+  } catch (error) {
+    console.error("Error trayendo /me:", error);
+    // Ante un error de base, igual respondemos con lo que hay en sesión: no
+    // tiene sentido tirar abajo el saludo/header por no poder traer la foto.
+    res.json({
+      usuarioId: req.session.usuarioId,
+      nombreCompleto: req.session.nombreCompleto,
+      rol: req.session.rol,
+      fotoUrl: null,
+    });
+  }
 });
 
 module.exports = router;

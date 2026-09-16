@@ -31,14 +31,18 @@ CREATE TABLE app_preguntas (
 );
 GO
 
--- Configuración personal por usuario (por ahora, tema claro/oscuro). Pensada
--- para ir sumando más preferencias más adelante sin tocar app_usuarios.
+-- Configuración personal por usuario (tema + datos de perfil). Pensada para
+-- ir sumando más preferencias más adelante sin tocar app_usuarios.
 IF OBJECT_ID('app_config_usuario', 'U') IS NOT NULL DROP TABLE app_config_usuario;
 GO
 
 CREATE TABLE app_config_usuario (
-    usuario_id  INT PRIMARY KEY FOREIGN KEY REFERENCES app_usuarios(id),
-    tema        NVARCHAR(10) NOT NULL DEFAULT 'claro' -- 'claro' | 'oscuro'
+    usuario_id       INT PRIMARY KEY FOREIGN KEY REFERENCES app_usuarios(id),
+    tema             NVARCHAR(10) NOT NULL DEFAULT 'claro', -- 'claro' | 'oscuro'
+    telefono         NVARCHAR(30) NULL,
+    email            NVARCHAR(150) NULL,
+    fecha_nacimiento DATE NULL,
+    foto_archivo     NVARCHAR(100) NULL -- nombre de archivo en src/uploads/perfiles
 );
 GO
 

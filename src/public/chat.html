@@ -43,6 +43,7 @@
 
       <section class="chat-panel">
         <div class="chat-panel-header">
+          <button type="button" id="btnVolverLista" class="btn-volver-lista" title="Volver a conversaciones">←</button>
           <div>
             <div id="chatPanelHeader">Elegí una conversación</div>
             <div id="chatPanelSubtitulo" class="chat-panel-subtitulo"></div>
@@ -51,13 +52,23 @@
         </div>
         <div class="chat-mensajes" id="chatMensajes"></div>
         <form id="formEnviar" class="chat-form-envio">
+          <div class="chat-emoji-wrap">
+            <button type="button" id="btnEmoji" class="chat-btn-adjuntar" title="Emojis">😀</button>
+            <div id="panelEmojis" class="chat-panel-emojis" hidden>
+              <div class="chat-panel-emojis-header">
+                <span>Emojis</span>
+                <button type="button" id="btnCerrarEmojis" class="chat-cerrar-emojis" title="Cerrar">✕</button>
+              </div>
+              <div id="gridEmojis" class="chat-grid-emojis"></div>
+            </div>
+          </div>
           <label class="chat-btn-adjuntar" title="Adjuntar imagen">
             📎
             <input type="file" id="inputImagen" accept="image/jpeg,image/png,image/webp,image/gif" hidden />
           </label>
           <span id="nombreImagenElegida" class="chat-nombre-imagen" hidden></span>
-          <input type="text" id="inputTexto" class="chat-input-texto" placeholder="Escribí un mensaje…" autocomplete="off" />
-          <button type="submit" class="btn-inferior principal">Enviar</button>
+          <input type="text" id="inputTexto" class="chat-input-texto" placeholder="Escribí un mensaje…" autocomplete="off" enterkeyhint="send" />
+          <button type="submit" class="chat-btn-enviar" title="Enviar" aria-label="Enviar">➤</button>
         </form>
       </section>
     </div>
@@ -69,6 +80,7 @@
   </footer>
 
   <script src="/comun.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
   <script>
     let usuarioId = null;
     let conversaciones = [];
@@ -76,7 +88,7 @@
     let ultimoMensajeId = 0;
     let intervaloMensajes = null;
     let intervaloConversaciones = null;
-    let intervaloParpadeo = null;
+    let socket = null;
     let noLeidosOtrasConversaciones = 0;
     let primeraCargaConversaciones = true;
     const tituloOriginal = document.title;
@@ -88,6 +100,10 @@
     const chatPanelSubtitulo = document.getElementById("chatPanelSubtitulo");
     const formEnviar = document.getElementById("formEnviar");
     const inputTexto = document.getElementById("inputTexto");
+    const btnEmoji = document.getElementById("btnEmoji");
+    const panelEmojis = document.getElementById("panelEmojis");
+    const gridEmojis = document.getElementById("gridEmojis");
+    const btnCerrarEmojis = document.getElementById("btnCerrarEmojis");
     const inputImagen = document.getElementById("inputImagen");
     const nombreImagenElegida = document.getElementById("nombreImagenElegida");
     const btnNuevoChat = document.getElementById("btnNuevoChat");
@@ -98,6 +114,8 @@
     const listaCheckboxesGrupo = document.getElementById("listaCheckboxesGrupo");
     const btnCrearGrupo = document.getElementById("btnCrearGrupo");
     const btnBorrarConversacion = document.getElementById("btnBorrarConversacion");
+    const btnVolverLista = document.getElementById("btnVolverLista");
+    const chatApp = document.querySelector(".chat-app");
 
     function tituloConversacion(conversacion) {
       if (conversacion.tipo === "privada") return conversacion.otro_nombre_completo;
@@ -116,6 +134,16 @@
       return "Sin mensajes todavía";
     }
 
+    // Avatar chico y redondo: foto si hay, si no la inicial del nombre. Se
+    // reusa en la lista de conversaciones, los buscadores de "+ Chat"/
+    // "+ Grupo" y el nombre de cada mensaje.
+    function avatarHtml(fotoUrl, nombre, chico) {
+      const clase = "chat-avatar" + (chico ? " chat-avatar-chico" : "");
+      if (fotoUrl) return `<img src="${fotoUrl}" class="${clase}" alt="" />`;
+      const inicial = (nombre || "?").trim().charAt(0).toUpperCase() || "?";
+      return `<span class="${clase}">${inicial}</span>`;
+    }
+
     function pintarListaConversaciones() {
       listaConversaciones.innerHTML = "";
       for (const conversacion of conversaciones) {
@@ -123,9 +151,16 @@
         item.type = "button";
         item.className = "chat-item-conversacion" + (conversacion.id === conversacionActualId ? " activa" : "");
         const punto = conversacion.tipo === "privada" && conversacion.otro_en_linea ? "🟢 " : "";
+        const avatar =
+          conversacion.tipo === "privada"
+            ? avatarHtml(conversacion.otro_foto_url, conversacion.otro_nombre_completo)
+            : `<span class="chat-avatar">👥</span>`;
         item.innerHTML = `
-          <span class="chat-item-titulo">${punto}${tituloConversacion(conversacion)}</span>
-          <span class="chat-item-preview">${previewConversacion(conversacion)}</span>
+          ${avatar}
+          <span class="chat-item-textos">
+            <span class="chat-item-titulo">${punto}${tituloConversacion(conversacion)}</span>
+            <span class="chat-item-preview">${previewConversacion(conversacion)}</span>
+          </span>
         `;
         if (conversacion.no_leidos > 0) {
           const badge = document.createElement("span");
@@ -140,7 +175,13 @@
 
     function avisarMensajeNuevo() {
       reproducirBeep();
-      if (document.hidden) iniciarParpadeoTitulo();
+    }
+
+    // Título tipo "viejo Facebook": mientras haya no leídos en OTRAS
+    // conversaciones, se ve el número en la pestaña, se esté mirando el
+    // chat o no. No es un parpadeo: se actualiza solo cuando cambia el total.
+    function actualizarTituloNoLeidos(total) {
+      document.title = total > 0 ? `${tituloOriginal} (${total > 99 ? "99+" : total})` : tituloOriginal;
     }
 
     function reproducirBeep() {
@@ -160,23 +201,6 @@
       }
     }
 
-    function iniciarParpadeoTitulo() {
-      if (intervaloParpadeo) return;
-      let mostrandoAviso = false;
-      intervaloParpadeo = setInterval(() => {
-        document.title = mostrandoAviso ? tituloOriginal : "💬 Mensaje nuevo";
-        mostrandoAviso = !mostrandoAviso;
-      }, 1000);
-    }
-
-    function detenerParpadeoTitulo() {
-      if (intervaloParpadeo) {
-        clearInterval(intervaloParpadeo);
-        intervaloParpadeo = null;
-      }
-      document.title = tituloOriginal;
-    }
-
     async function cargarConversaciones() {
       const respuesta = await fetch("/api/chat/conversaciones");
       if (respuesta.status === 401) {
@@ -192,6 +216,7 @@
       if (!primeraCargaConversaciones && totalOtras > noLeidosOtrasConversaciones) avisarMensajeNuevo();
       noLeidosOtrasConversaciones = totalOtras;
       primeraCargaConversaciones = false;
+      actualizarTituloNoLeidos(totalOtras);
 
       if (conversacionActualId) {
         const actual = conversaciones.find((c) => c.id === conversacionActualId);
@@ -210,7 +235,12 @@
 
       const autor = document.createElement("div");
       autor.className = "chat-autor";
-      autor.textContent = esPropio ? "Vos" : mensaje.nombre_completo;
+      if (esPropio) {
+        autor.textContent = "Vos";
+      } else {
+        autor.innerHTML = avatarHtml(mensaje.foto_url, mensaje.nombre_completo, true);
+        autor.appendChild(document.createTextNode(mensaje.nombre_completo));
+      }
       burbuja.appendChild(autor);
 
       if (mensaje.texto) {
@@ -261,7 +291,7 @@
       }
     }
 
-    async function abrirConversacion(id) {
+    async function abrirConversacion(id, { navegarEnMobile = true } = {}) {
       conversacionActualId = id;
       ultimoMensajeId = 0;
       chatMensajes.innerHTML = "";
@@ -270,6 +300,12 @@
       chatPanelHeader.textContent = conversacion ? tituloConversacion(conversacion) : "";
       chatPanelSubtitulo.textContent = conversacion ? subtituloPresencia(conversacion) : "";
       btnBorrarConversacion.hidden = false;
+      // En celular, la lista y el panel del chat ocupan toda la pantalla por
+      // turnos (como WhatsApp); en desktop esta clase no cambia nada visual.
+      // navegarEnMobile=false se usa solo al abrir "General" automáticamente
+      // al cargar la página, para no saltar de una a la conversación sin
+      // que el usuario la haya elegido.
+      if (navegarEnMobile) chatApp.classList.add("chat-conversacion-abierta");
       pintarListaConversaciones();
 
       const respuesta = await fetch(`/api/chat/conversaciones/${id}/mensajes`);
@@ -304,6 +340,106 @@
       if (intervaloMensajes) clearInterval(intervaloMensajes);
       intervaloMensajes = setInterval(revisarMensajesNuevos, 2000);
     }
+
+    // Mensaje que llega por WebSocket (instantáneo, no depende del sondeo
+    // de 2s ni de que la pestaña esté en primer plano). El sondeo se deja
+    // como respaldo (por si el socket se cae o algo intermedio lo bloquea),
+    // así que acá nos cuidamos de no agregar dos veces el mismo mensaje.
+    function manejarMensajeNuevoSocket(mensaje) {
+      if (mensaje.conversacion_id !== conversacionActualId) {
+        // No es la conversación abierta: alcanza con refrescar la lista
+        // (actualiza no-leídos, preview, avisa con beep/título si subió el
+        // contador) en vez de tocar los mensajes en pantalla.
+        cargarConversaciones();
+        return;
+      }
+      if (mensaje.id <= ultimoMensajeId) return; // ya lo agregamos por REST/polling
+      agregarMensaje(mensaje);
+      scrollAbajo();
+      if (mensaje.usuario_id !== usuarioId) {
+        avisarMensajeNuevo();
+        // Estoy mirando esta conversación ahora mismo: se marca como leída
+        // al toque, sin esperar al próximo GET de mensajes.
+        socket.emit("marcarLeido", { conversacionId: conversacionActualId, mensajeId: mensaje.id });
+      }
+    }
+
+    function conectarSocket() {
+      socket = io();
+      socket.on("mensajeNuevo", manejarMensajeNuevoSocket);
+      socket.on("lecturaActualizada", (payload) => {
+        if (payload.conversacionId === conversacionActualId) actualizarVistos();
+      });
+      // Grupo/DM nuevo en el que me incluyeron: refresca la lista para que
+      // aparezca sin esperar el sondeo de conversaciones (10s).
+      socket.on("conversacionNueva", () => cargarConversaciones());
+    }
+
+    // Algunos teclados de celular (sobre todo con predicción/autocorrección
+    // activa) no disparan un submit normal del form al tocar Enter/Ir: lo
+    // forzamos a mano para que "Enter" siempre mande el mensaje.
+    inputTexto.addEventListener("keydown", (evento) => {
+      if (evento.key === "Enter" && !evento.shiftKey) {
+        evento.preventDefault();
+        formEnviar.requestSubmit();
+      }
+    });
+
+    const EMOJIS = [
+      // Caras y emociones
+      "😀", "😃", "😄", "😁", "😆", "😅", "🤣", "😂", "🙂", "🙃",
+      "😉", "😊", "😇", "🥰", "😍", "🤩", "😘", "😗", "😋", "😛",
+      "🤪", "😜", "🤨", "🧐", "🤓", "😎", "🥸", "🤗", "🤔", "🤭",
+      "🤫", "🤥", "😐", "😑", "😶", "😏", "😒", "🙄", "😬", "🤐",
+      "😔", "😪", "🤤", "😴", "😷", "🤒", "🤕", "🤢", "🥵", "🥶",
+      "😵", "🤯", "🥳", "🥺", "😢", "😭", "😤", "😠", "😡", "🤬",
+      "😨", "😰", "😥", "😓", "🤫", "🙁", "😞", "😩", "😫", "🥱",
+      // Gestos y personas
+      "👍", "👎", "👏", "🙌", "🙏", "🤝", "💪", "✌️", "🤞", "👋",
+      "👌", "🤙", "☝️", "✋", "🖐️", "👊", "🤷", "🤦", "🧑‍💻", "🕺",
+      // Corazones y símbolos
+      "❤️", "🧡", "💛", "💚", "💙", "💜", "🖤", "🤍", "💔", "💕",
+      "✅", "❌", "⚠️", "❗", "❓", "💯", "🔥", "✨", "🎉", "🎊",
+      // Objetos y trabajo (que aparecen bastante en un chat de oficina)
+      "📌", "📎", "📅", "🕐", "⏰", "📝", "📄", "📊", "💬", "📞",
+      "☕", "🍕", "🎂", "🎁", "🚗", "🏠", "💡", "🔒", "🔑", "👀",
+    ];
+
+    function pintarPanelEmojis() {
+      if (gridEmojis.childElementCount > 0) return;
+      for (const emoji of EMOJIS) {
+        const boton = document.createElement("button");
+        boton.type = "button";
+        boton.textContent = emoji;
+        boton.addEventListener("click", () => insertarEmoji(emoji));
+        gridEmojis.appendChild(boton);
+      }
+    }
+
+    function insertarEmoji(emoji) {
+      const inicio = inputTexto.selectionStart ?? inputTexto.value.length;
+      const fin = inputTexto.selectionEnd ?? inputTexto.value.length;
+      inputTexto.value = inputTexto.value.slice(0, inicio) + emoji + inputTexto.value.slice(fin);
+      const posicion = inicio + emoji.length;
+      inputTexto.focus();
+      inputTexto.setSelectionRange(posicion, posicion);
+    }
+
+    btnEmoji.addEventListener("click", (evento) => {
+      evento.stopPropagation();
+      pintarPanelEmojis();
+      panelEmojis.hidden = !panelEmojis.hidden;
+    });
+
+    btnCerrarEmojis.addEventListener("click", () => {
+      panelEmojis.hidden = true;
+    });
+
+    document.addEventListener("click", (evento) => {
+      if (!panelEmojis.hidden && !panelEmojis.contains(evento.target) && evento.target !== btnEmoji) {
+        panelEmojis.hidden = true;
+      }
+    });
 
     inputImagen.addEventListener("change", () => {
       const archivo = inputImagen.files[0];
@@ -372,7 +508,9 @@
         const item = document.createElement("button");
         item.type = "button";
         item.className = "chat-picker-item";
-        item.textContent = (usuario.en_linea ? "🟢 " : "") + usuario.nombre_completo;
+        item.innerHTML =
+          avatarHtml(usuario.foto_url, usuario.nombre_completo, true) +
+          `<span>${usuario.en_linea ? "🟢 " : ""}${usuario.nombre_completo}</span>`;
         item.addEventListener("click", async () => {
           pickerUsuarios.hidden = true;
           const creacion = await fetch("/api/chat/conversaciones", {
@@ -405,7 +543,10 @@
       for (const usuario of usuarios) {
         const label = document.createElement("label");
         label.className = "chat-checkbox-usuario";
-        label.innerHTML = `<input type="checkbox" value="${usuario.id}" /> ${usuario.en_linea ? "🟢 " : ""}${usuario.nombre_completo}`;
+        label.innerHTML =
+          `<input type="checkbox" value="${usuario.id}" />` +
+          avatarHtml(usuario.foto_url, usuario.nombre_completo, true) +
+          `<span>${usuario.en_linea ? "🟢 " : ""}${usuario.nombre_completo}</span>`;
         listaCheckboxesGrupo.appendChild(label);
       }
       pickerGrupo.hidden = false;
@@ -433,6 +574,13 @@
       pickerGrupo.hidden = true;
       await cargarConversaciones();
       abrirConversacion(datos.id);
+    });
+
+    btnVolverLista.addEventListener("click", () => {
+      // Solo oculta el panel y muestra la lista (en desktop no hace nada
+      // visualmente): la conversación sigue "abierta" en segundo plano, o
+      // sea que el sondeo de mensajes/vistos sigue corriendo igual.
+      chatApp.classList.remove("chat-conversacion-abierta");
     });
 
     btnBorrarConversacion.addEventListener("click", async () => {
@@ -467,29 +615,25 @@
       const me = await meRespuesta.json();
       usuarioId = me.usuarioId;
 
+      conectarSocket();
       await cargarConversaciones();
 
       const grupal = conversaciones.find((c) => c.tipo === "grupal");
-      if (grupal) abrirConversacion(grupal.id);
+      if (grupal) abrirConversacion(grupal.id, { navegarEnMobile: false });
 
       intervaloConversaciones = setInterval(cargarConversaciones, 10000);
     }
 
+    // Antes se cortaba todo el sondeo al minimizar/cambiar de pestaña; ahora
+    // lo dejamos corriendo para que los mensajes y el "visto" sigan
+    // llegando en 2do plano (el navegador igual va a frenar un poco el
+    // ritmo de los timers en pestañas ocultas, pero no los va a parar del
+    // todo). Al volver a mirar la pestaña, además, refrescamos ya mismo en
+    // vez de esperar al próximo tick.
     document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") {
-        if (intervaloMensajes) clearInterval(intervaloMensajes);
-        if (intervaloConversaciones) clearInterval(intervaloConversaciones);
-      } else {
-        detenerParpadeoTitulo();
-        // Al volver a la ventana, refrescamos ya mismo en vez de esperar
-        // al próximo tick del intervalo (podían pasar hasta 10s de espera).
-        if (conversacionActualId) {
-          revisarMensajesNuevos();
-          reiniciarPollingMensajes();
-        }
+      if (document.visibilityState === "visible") {
+        if (conversacionActualId) revisarMensajesNuevos();
         cargarConversaciones();
-        if (intervaloConversaciones) clearInterval(intervaloConversaciones);
-        intervaloConversaciones = setInterval(cargarConversaciones, 10000);
       }
     });
 
