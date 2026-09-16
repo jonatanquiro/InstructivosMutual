@@ -62,16 +62,27 @@ app.use("/api", requiereLogin, requiereAdmin, usuariosRoutes);
 app.use("/api", requiereLogin, requiereAdmin, faqAdminRoutes);
 app.use("/api", requiereLogin, requiereAdmin, estadisticasRoutes);
 
+// Si CHAT_UPLOADS_DIR/PERFIL_UPLOADS_DIR es una ruta absoluta (por ejemplo
+// "F:\ChatMutual" para guardar los adjuntos en otro disco) se usa tal cual;
+// si es relativa, se resuelve respecto de esta carpeta (src/) como antes.
+// path.join NO hace esto solo: si se le pasa una ruta absoluta como
+// segundo argumento la concatena en vez de "resetear" a la raíz, así que
+// hace falta este chequeo explícito con path.isAbsolute.
+function resolverCarpetaUploads(variableEntorno, porDefecto) {
+  const configurada = process.env[variableEntorno] || porDefecto;
+  return path.isAbsolute(configurada) ? configurada : path.join(__dirname, configurada);
+}
+
 // Carpeta donde se guardan las imágenes adjuntadas al chat. Se sirve detrás
 // de requiereLogin (antes del static general) porque son datos internos de
 // la mutual, no contenido público como /img. CHAT_UPLOADS_DIR permite que
 // la instancia de testeo use una carpeta separada de la de producción.
-const CARPETA_UPLOADS_CHAT = path.join(__dirname, process.env.CHAT_UPLOADS_DIR || "uploads/chat");
+const CARPETA_UPLOADS_CHAT = resolverCarpetaUploads("CHAT_UPLOADS_DIR", "uploads/chat");
 fs.mkdirSync(CARPETA_UPLOADS_CHAT, { recursive: true });
 app.use("/uploads/chat", requiereLogin, express.static(CARPETA_UPLOADS_CHAT));
 
 // Fotos de perfil: mismo criterio que las del chat (no son públicas).
-const CARPETA_UPLOADS_PERFILES = path.join(__dirname, process.env.PERFIL_UPLOADS_DIR || "uploads/perfiles");
+const CARPETA_UPLOADS_PERFILES = resolverCarpetaUploads("PERFIL_UPLOADS_DIR", "uploads/perfiles");
 fs.mkdirSync(CARPETA_UPLOADS_PERFILES, { recursive: true });
 app.use("/uploads/perfiles", requiereLogin, express.static(CARPETA_UPLOADS_PERFILES));
 

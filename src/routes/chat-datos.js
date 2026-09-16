@@ -65,4 +65,35 @@ async function obtenerLecturasDeOtros(pool, conversacionId, usuarioId) {
   return otros.recordset;
 }
 
-module.exports = { verificarAcceso, marcarLeido, obtenerLecturasDeOtros };
+// Trae las reacciones de un conjunto de mensajes de una sola vez (en vez de
+// una consulta por mensaje) y las agrupa por mensaje_id, lista para adjuntar
+// a cada fila en la respuesta de GET /mensajes.
+async function obtenerReaccionesDeMensajes(pool, mensajeIds) {
+  const porMensaje = new Map();
+  if (mensajeIds.length === 0) return porMensaje;
+
+  const solicitud = pool.request();
+  const placeholders = mensajeIds.map((id, i) => {
+    solicitud.input(`id${i}`, sql.Int, id);
+    return `@id${i}`;
+  });
+
+  const resultado = await solicitud.query(`
+    SELECT r.mensaje_id, r.usuario_id, r.emoji, u.nombre_completo
+    FROM app_chat_reacciones r
+    JOIN app_usuarios u ON u.id = r.usuario_id
+    WHERE r.mensaje_id IN (${placeholders.join(", ")})
+  `);
+
+  for (const fila of resultado.recordset) {
+    if (!porMensaje.has(fila.mensaje_id)) porMensaje.set(fila.mensaje_id, []);
+    porMensaje.get(fila.mensaje_id).push({
+      usuarioId: fila.usuario_id,
+      nombreCompleto: fila.nombre_completo,
+      emoji: fila.emoji,
+    });
+  }
+  return porMensaje;
+}
+
+module.exports = { verificarAcceso, marcarLeido, obtenerLecturasDeOtros, obtenerReaccionesDeMensajes };

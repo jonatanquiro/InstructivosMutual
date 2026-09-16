@@ -9,8 +9,12 @@ const router = express.Router();
 
 // Igual patrón que src/uploads/chat: nombre random en disco, carpeta
 // configurable (PERFIL_UPLOADS_DIR, opcional) por si algún día hace falta
-// separar test de producción como ya se hace con el chat.
-const CARPETA_UPLOADS_PERFILES = path.join(__dirname, "..", process.env.PERFIL_UPLOADS_DIR || "uploads/perfiles");
+// separar test de producción como ya se hace con el chat. También puede ser
+// una ruta absoluta en otro disco (ver resolverCarpetaUploads en server.js).
+const CARPETA_UPLOADS_PERFILES_CONFIGURADA = process.env.PERFIL_UPLOADS_DIR || "uploads/perfiles";
+const CARPETA_UPLOADS_PERFILES = path.isAbsolute(CARPETA_UPLOADS_PERFILES_CONFIGURADA)
+  ? CARPETA_UPLOADS_PERFILES_CONFIGURADA
+  : path.join(__dirname, "..", CARPETA_UPLOADS_PERFILES_CONFIGURADA);
 const TIPOS_IMAGEN_PERMITIDOS = ["image/jpeg", "image/png", "image/webp"];
 const EXTENSION_POR_TIPO = {
   "image/jpeg": ".jpg",

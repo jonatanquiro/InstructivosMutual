@@ -8,7 +8,9 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "start:test": "set ENV_FILE=.env.test&& node src/server.js",
-    "dev:test": "set ENV_FILE=.env.test&& node --watch src/server.js"
+    "dev:test": "set ENV_FILE=.env.test&& node --watch src/server.js",
+    "vaciar-chat": "node scripts/vaciar-chat.js",
+    "vaciar-chat:test": "set ENV_FILE=.env.test&& node scripts/vaciar-chat.js"
   },
   "dependencies": {
     "bcrypt": "^6.0.0",

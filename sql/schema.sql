@@ -101,9 +101,24 @@ CREATE TABLE app_chat_mensajes (
     usuario_id      INT NOT NULL FOREIGN KEY REFERENCES app_usuarios(id),
     texto           NVARCHAR(MAX) NULL,  -- cifrado (base64), no texto plano
     imagen_archivo  NVARCHAR(300) NULL,
-    fecha           DATETIME NOT NULL DEFAULT GETDATE()
+    fecha           DATETIME NOT NULL DEFAULT GETDATE(),
+    editado         BIT NOT NULL DEFAULT 0,
+    eliminado       BIT NOT NULL DEFAULT 0
 );
 CREATE INDEX IX_chat_mensajes_conversacion ON app_chat_mensajes(conversacion_id, fecha);
+GO
+
+-- Una reacción por usuario por mensaje (elegir otro emoji reemplaza la
+-- reacción anterior, igual que WhatsApp).
+IF OBJECT_ID('app_chat_reacciones', 'U') IS NOT NULL DROP TABLE app_chat_reacciones;
+GO
+
+CREATE TABLE app_chat_reacciones (
+    mensaje_id INT NOT NULL FOREIGN KEY REFERENCES app_chat_mensajes(id),
+    usuario_id INT NOT NULL FOREIGN KEY REFERENCES app_usuarios(id),
+    emoji      NVARCHAR(20) NOT NULL,
+    PRIMARY KEY (mensaje_id, usuario_id)
+);
 GO
 
 -- Hasta qué mensaje leyó cada usuario en cada conversación (badge de no

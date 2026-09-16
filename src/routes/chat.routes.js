@@ -6,15 +6,24 @@ const multer = require("multer");
 const { sql, getPool } = require("../config/db");
 const { cifrarTexto, descifrarTexto } = require("../config/cifrado");
 const { estaEnLinea } = require("../config/presencia");
-const { verificarAcceso, marcarLeido, obtenerLecturasDeOtros } = require("./chat-datos");
+const {
+  verificarAcceso,
+  marcarLeido,
+  obtenerLecturasDeOtros,
+  obtenerReaccionesDeMensajes,
+} = require("./chat-datos");
 const { emitirAConversacion, emitirAUsuario, unirUsuarioAConversacion } = require("../config/socket");
 
 const router = express.Router();
 
 // Tiene que coincidir con la carpeta que sirve server.js en /uploads/chat.
 // CHAT_UPLOADS_DIR permite que la instancia de testeo use una carpeta
-// separada de la de producción (ver .env.test).
-const CARPETA_UPLOADS = path.join(__dirname, "..", process.env.CHAT_UPLOADS_DIR || "uploads/chat");
+// separada de la de producción (ver .env.test), y también puede ser una
+// ruta absoluta en otro disco (por ejemplo "F:\ChatMutual\chat").
+const CARPETA_UPLOADS_CHAT_CONFIGURADA = process.env.CHAT_UPLOADS_DIR || "uploads/chat";
+const CARPETA_UPLOADS = path.isAbsolute(CARPETA_UPLOADS_CHAT_CONFIGURADA)
+  ? CARPETA_UPLOADS_CHAT_CONFIGURADA
+  : path.join(__dirname, "..", CARPETA_UPLOADS_CHAT_CONFIGURADA);
 const TIPOS_IMAGEN_PERMITIDOS = ["image/jpeg", "image/png", "image/webp", "image/gif"];
 const EXTENSION_POR_TIPO = {
   "image/jpeg": ".jpg",
@@ -309,7 +318,7 @@ router.get("/chat/conversaciones/:id/mensajes", async (req, res) => {
       .query(`
         SELECT * FROM (
           SELECT TOP 50 m.id, m.usuario_id, u.nombre_completo, cfg.foto_archivo,
-            m.texto, m.imagen_archivo, m.fecha
+            m.texto, m.imagen_archivo, m.fecha, m.editado, m.eliminado
           FROM app_chat_mensajes m
           JOIN app_usuarios u ON u.id = m.usuario_id
           LEFT JOIN app_config_usuario cfg ON cfg.usuario_id = m.usuario_id
@@ -332,11 +341,17 @@ router.get("/chat/conversaciones/:id/mensajes", async (req, res) => {
     const lecturasDeOtros =
       acceso.tipo !== "grupal" ? await obtenerLecturasDeOtros(pool, conversacionId, usuarioId) : [];
 
+    const reaccionesPorMensaje = await obtenerReaccionesDeMensajes(
+      pool,
+      resultado.recordset.map((fila) => fila.id)
+    );
+
     const mensajes = resultado.recordset.map((fila) => {
       const base = {
         ...fila,
         texto: descifrarTexto(fila.texto),
         foto_url: fila.foto_archivo ? `/uploads/perfiles/${fila.foto_archivo}` : null,
+        reacciones: reaccionesPorMensaje.get(fila.id) || [],
       };
       if (fila.usuario_id === usuarioId && lecturasDeOtros.length > 0) {
         base.visto = lecturasDeOtros.every((otro) => otro.ultimo_mensaje_id >= fila.id);
@@ -427,6 +442,9 @@ router.post("/chat/conversaciones/:id/mensajes", upload.single("imagen"), async 
       texto: texto || null,
       imagen_archivo: req.file ? req.file.filename : null,
       fecha: resultado.recordset[0].fecha,
+      editado: false,
+      eliminado: false,
+      reacciones: [],
     };
     if (acceso.tipo !== "grupal") mensaje.visto = false;
     emitirAConversacion(conversacionId, "mensajeNuevo", mensaje);
@@ -434,6 +452,149 @@ router.post("/chat/conversaciones/:id/mensajes", upload.single("imagen"), async 
     res.status(201).json(mensaje);
   } catch (error) {
     console.error("Error enviando mensaje de chat:", error);
+    res.status(500).json({ error: "Error de servidor" });
+  }
+});
+
+// Trae un mensaje propio (para validar dueño antes de editar/borrar/etc.),
+// junto con la conversación a la que pertenece para poder avisar por socket.
+async function buscarMensajePropio(pool, mensajeId, usuarioId) {
+  const resultado = await pool
+    .request()
+    .input("id", sql.Int, mensajeId)
+    .query(`
+      SELECT id, conversacion_id, usuario_id, imagen_archivo, eliminado
+      FROM app_chat_mensajes WHERE id = @id
+    `);
+  const mensaje = resultado.recordset[0];
+  if (!mensaje) return null;
+  if (mensaje.usuario_id !== usuarioId) return false;
+  return mensaje;
+}
+
+// Edita el texto de un mensaje propio. Solo texto (no se puede "editar" la
+// imagen adjunta): si el mensaje no tiene texto, no tiene sentido editarlo
+// por acá, se borra y se manda uno nuevo.
+router.put("/chat/mensajes/:id", async (req, res) => {
+  const mensajeId = Number(req.params.id);
+  const texto = String(req.body.texto || "").trim().slice(0, 2000);
+  if (!texto) return res.status(400).json({ error: "El mensaje no puede quedar vacío" });
+
+  try {
+    const pool = await getPool();
+    const mensaje = await buscarMensajePropio(pool, mensajeId, req.session.usuarioId);
+    if (mensaje === null) return res.status(404).json({ error: "Mensaje no encontrado" });
+    if (mensaje === false) return res.status(403).json({ error: "No autorizado" });
+    if (mensaje.eliminado) return res.status(400).json({ error: "El mensaje fue eliminado" });
+
+    await pool
+      .request()
+      .input("id", sql.Int, mensajeId)
+      .input("texto", sql.NVarChar, cifrarTexto(texto))
+      .query("UPDATE app_chat_mensajes SET texto = @texto, editado = 1 WHERE id = @id");
+
+    const datos = { id: mensajeId, conversacionId: mensaje.conversacion_id, texto, editado: true };
+    emitirAConversacion(mensaje.conversacion_id, "mensajeEditado", datos);
+    res.json(datos);
+  } catch (error) {
+    console.error("Error editando mensaje de chat:", error);
+    res.status(500).json({ error: "Error de servidor" });
+  }
+});
+
+// Borra un mensaje propio puntual (a diferencia del DELETE de más abajo,
+// que vacía toda la conversación). Es borrado "estilo WhatsApp": la fila
+// queda pero sin texto/imagen, marcada como eliminada, para no correr los
+// ids de los demás mensajes ni romper el historial de lecturas.
+router.delete("/chat/mensajes/:id", async (req, res) => {
+  const mensajeId = Number(req.params.id);
+
+  try {
+    const pool = await getPool();
+    const mensaje = await buscarMensajePropio(pool, mensajeId, req.session.usuarioId);
+    if (mensaje === null) return res.status(404).json({ error: "Mensaje no encontrado" });
+    if (mensaje === false) return res.status(403).json({ error: "No autorizado" });
+    if (mensaje.eliminado) return res.json({ ok: true });
+
+    if (mensaje.imagen_archivo) {
+      await fs.unlink(path.join(CARPETA_UPLOADS, mensaje.imagen_archivo)).catch(() => {});
+    }
+
+    await pool
+      .request()
+      .input("id", sql.Int, mensajeId)
+      .query(`
+        DELETE FROM app_chat_reacciones WHERE mensaje_id = @id;
+        UPDATE app_chat_mensajes SET texto = NULL, imagen_archivo = NULL, eliminado = 1 WHERE id = @id;
+      `);
+
+    emitirAConversacion(mensaje.conversacion_id, "mensajeEliminado", {
+      id: mensajeId,
+      conversacionId: mensaje.conversacion_id,
+    });
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Error borrando mensaje de chat:", error);
+    res.status(500).json({ error: "Error de servidor" });
+  }
+});
+
+// Reacciona (o saca la reacción) a un mensaje. Una sola reacción por
+// usuario por mensaje: mandar el mismo emoji que ya tenía puesto la saca
+// (toggle), mandar uno distinto la reemplaza.
+router.post("/chat/mensajes/:id/reacciones", async (req, res) => {
+  const mensajeId = Number(req.params.id);
+  const emoji = String(req.body.emoji || "").trim().slice(0, 20);
+  const usuarioId = req.session.usuarioId;
+  if (!emoji) return res.status(400).json({ error: "Falta el emoji" });
+
+  try {
+    const pool = await getPool();
+    const resultado = await pool
+      .request()
+      .input("id", sql.Int, mensajeId)
+      .query("SELECT id, conversacion_id, eliminado FROM app_chat_mensajes WHERE id = @id");
+    const mensaje = resultado.recordset[0];
+    if (!mensaje) return res.status(404).json({ error: "Mensaje no encontrado" });
+    if (mensaje.eliminado) return res.status(400).json({ error: "El mensaje fue eliminado" });
+
+    const acceso = await verificarAcceso(pool, mensaje.conversacion_id, usuarioId);
+    if (!acceso) return res.status(403).json({ error: "No autorizado" });
+
+    const existente = await pool
+      .request()
+      .input("mensajeId", sql.Int, mensajeId)
+      .input("usuarioId", sql.Int, usuarioId)
+      .query("SELECT emoji FROM app_chat_reacciones WHERE mensaje_id = @mensajeId AND usuario_id = @usuarioId");
+
+    if (existente.recordset[0]?.emoji === emoji) {
+      await pool
+        .request()
+        .input("mensajeId", sql.Int, mensajeId)
+        .input("usuarioId", sql.Int, usuarioId)
+        .query("DELETE FROM app_chat_reacciones WHERE mensaje_id = @mensajeId AND usuario_id = @usuarioId");
+    } else {
+      await pool
+        .request()
+        .input("mensajeId", sql.Int, mensajeId)
+        .input("usuarioId", sql.Int, usuarioId)
+        .input("emoji", sql.NVarChar, emoji)
+        .query(`
+          MERGE app_chat_reacciones AS destino
+          USING (SELECT @mensajeId AS mensaje_id, @usuarioId AS usuario_id) AS origen
+          ON destino.mensaje_id = origen.mensaje_id AND destino.usuario_id = origen.usuario_id
+          WHEN MATCHED THEN UPDATE SET emoji = @emoji
+          WHEN NOT MATCHED THEN INSERT (mensaje_id, usuario_id, emoji) VALUES (@mensajeId, @usuarioId, @emoji);
+        `);
+    }
+
+    const reaccionesPorMensaje = await obtenerReaccionesDeMensajes(pool, [mensajeId]);
+    const reacciones = reaccionesPorMensaje.get(mensajeId) || [];
+    const datos = { id: mensajeId, conversacionId: mensaje.conversacion_id, reacciones };
+    emitirAConversacion(mensaje.conversacion_id, "reaccionesActualizadas", datos);
+    res.json(datos);
+  } catch (error) {
+    console.error("Error reaccionando a mensaje de chat:", error);
     res.status(500).json({ error: "Error de servidor" });
   }
 });
@@ -463,10 +624,17 @@ router.delete("/chat/conversaciones/:id/mensajes", async (req, res) => {
       }
     }
 
+    // Las reacciones tienen FK a app_chat_mensajes: hay que borrarlas antes
+    // o el DELETE de los mensajes falla por integridad referencial.
     await pool
       .request()
       .input("conversacionId", sql.Int, conversacionId)
-      .query("DELETE FROM app_chat_mensajes WHERE conversacion_id = @conversacionId");
+      .query(`
+        DELETE r FROM app_chat_reacciones r
+        JOIN app_chat_mensajes m ON m.id = r.mensaje_id
+        WHERE m.conversacion_id = @conversacionId;
+        DELETE FROM app_chat_mensajes WHERE conversacion_id = @conversacionId;
+      `);
 
     res.json({ ok: true });
   } catch (error) {

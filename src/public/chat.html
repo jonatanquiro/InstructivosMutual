@@ -72,6 +72,12 @@
         </form>
       </section>
     </div>
+
+    <div id="menuAccionesMensaje" class="chat-menu-acciones" hidden>
+      <div id="menuReaccionesRapidas" class="chat-menu-reacciones"></div>
+      <button type="button" id="btnMenuEditar" class="chat-menu-item">✏️ Editar</button>
+      <button type="button" id="btnMenuEliminar" class="chat-menu-item chat-menu-item-peligro">🗑️ Eliminar</button>
+    </div>
   </main>
 
   <footer class="barra-inferior">
@@ -93,6 +99,12 @@
     let primeraCargaConversaciones = true;
     const tituloOriginal = document.title;
     const burbujasPropiasSinVisto = new Map();
+    // Datos de cada burbuja renderizada, indexados por id de mensaje, para
+    // poder aplicarle edición/borrado/reacciones que lleguen después (por
+    // socket o por acción propia) sin tener que volver a pintar todo.
+    const burbujasPorId = new Map();
+    const REACCIONES_RAPIDAS = ["👍", "❤️", "😂", "😮", "😢", "🙏"];
+    let menuMensajeActualId = null;
 
     const listaConversaciones = document.getElementById("listaConversaciones");
     const chatMensajes = document.getElementById("chatMensajes");
@@ -116,6 +128,10 @@
     const btnBorrarConversacion = document.getElementById("btnBorrarConversacion");
     const btnVolverLista = document.getElementById("btnVolverLista");
     const chatApp = document.querySelector(".chat-app");
+    const menuAccionesMensaje = document.getElementById("menuAccionesMensaje");
+    const menuReaccionesRapidas = document.getElementById("menuReaccionesRapidas");
+    const btnMenuEditar = document.getElementById("btnMenuEditar");
+    const btnMenuEliminar = document.getElementById("btnMenuEliminar");
 
     function tituloConversacion(conversacion) {
       if (conversacion.tipo === "privada") return conversacion.otro_nombre_completo;
@@ -232,6 +248,7 @@
       const burbuja = document.createElement("div");
       const esPropio = mensaje.usuario_id === usuarioId;
       burbuja.className = "burbuja " + (esPropio ? "burbuja-usuario" : "burbuja-bot");
+      burbuja.dataset.id = mensaje.id;
 
       const autor = document.createElement("div");
       autor.className = "chat-autor";
@@ -243,13 +260,20 @@
       }
       burbuja.appendChild(autor);
 
-      if (mensaje.texto) {
-        const texto = document.createElement("div");
-        texto.style.whiteSpace = "pre-wrap";
-        texto.textContent = mensaje.texto;
-        burbuja.appendChild(texto);
-      }
+      const cajaTexto = document.createElement("div");
+      cajaTexto.className = "chat-texto-mensaje";
+      cajaTexto.style.whiteSpace = "pre-wrap";
+      const contenidoTexto = document.createElement("span");
+      contenidoTexto.className = "chat-texto-contenido";
+      const marcaEditado = document.createElement("span");
+      marcaEditado.className = "chat-editado-marca";
+      marcaEditado.textContent = " (editado)";
+      marcaEditado.hidden = !mensaje.editado;
+      cajaTexto.append(contenidoTexto, marcaEditado);
+      cajaTexto.hidden = !mensaje.texto && !mensaje.eliminado;
+      burbuja.appendChild(cajaTexto);
 
+      let imagenEl = null;
       if (mensaje.imagen_archivo) {
         const enlace = document.createElement("a");
         enlace.href = `/uploads/chat/${mensaje.imagen_archivo}`;
@@ -260,7 +284,13 @@
         imagen.className = "chat-imagen-mensaje";
         enlace.appendChild(imagen);
         burbuja.appendChild(enlace);
+        imagenEl = enlace;
       }
+
+      const reaccionesEl = document.createElement("div");
+      reaccionesEl.className = "chat-reacciones";
+      reaccionesEl.hidden = true;
+      burbuja.appendChild(reaccionesEl);
 
       if (esPropio && mensaje.visto !== undefined) {
         const check = document.createElement("span");
@@ -270,9 +300,249 @@
         if (!mensaje.visto) burbujasPropiasSinVisto.set(mensaje.id, check);
       }
 
+      const btnAcciones = document.createElement("button");
+      btnAcciones.type = "button";
+      btnAcciones.className = "chat-btn-acciones";
+      btnAcciones.title = "Opciones";
+      btnAcciones.setAttribute("aria-label", "Opciones del mensaje");
+      btnAcciones.textContent = "⋮";
+      btnAcciones.addEventListener("click", (evento) => {
+        evento.stopPropagation();
+        abrirMenuAcciones(mensaje.id, btnAcciones);
+      });
+      burbuja.appendChild(btnAcciones);
+
+      const ref = {
+        burbuja,
+        cajaTexto,
+        contenidoTexto,
+        marcaEditado,
+        imagenEl,
+        reaccionesEl,
+        btnAcciones,
+        esPropio,
+        tieneTexto: !!mensaje.texto,
+        eliminado: !!mensaje.eliminado,
+      };
+      burbujasPorId.set(mensaje.id, ref);
+
+      if (mensaje.eliminado) {
+        aplicarEliminacionEnRef(ref);
+      } else {
+        contenidoTexto.textContent = mensaje.texto || "";
+        pintarReacciones(reaccionesEl, mensaje.reacciones, mensaje.id);
+      }
+
       chatMensajes.appendChild(burbuja);
       ultimoMensajeId = Math.max(ultimoMensajeId, mensaje.id);
     }
+
+    // Agrupa las reacciones por emoji (cantidad + si el usuario actual ya
+    // puso esa) y las pinta como "pills" clickeables debajo del mensaje.
+    // Tocar una pill llama a la misma reaccionar() que el menú de opciones:
+    // así sirve tanto para sumar como para sacarse la reacción (toggle).
+    function pintarReacciones(el, reacciones, mensajeId) {
+      el.innerHTML = "";
+      if (!reacciones || reacciones.length === 0) {
+        el.hidden = true;
+        return;
+      }
+      const porEmoji = new Map();
+      for (const r of reacciones) {
+        if (!porEmoji.has(r.emoji)) porEmoji.set(r.emoji, { cantidad: 0, propia: false, nombres: [] });
+        const info = porEmoji.get(r.emoji);
+        info.cantidad++;
+        info.nombres.push(r.nombreCompleto);
+        if (r.usuarioId === usuarioId) info.propia = true;
+      }
+      for (const [emoji, info] of porEmoji) {
+        const pill = document.createElement("button");
+        pill.type = "button";
+        pill.className = "chat-reaccion-pill" + (info.propia ? " propia" : "");
+        pill.title = info.nombres.join(", ");
+        pill.textContent = info.cantidad > 1 ? `${emoji} ${info.cantidad}` : emoji;
+        pill.addEventListener("click", () => reaccionar(mensajeId, emoji));
+        el.appendChild(pill);
+      }
+      el.hidden = false;
+    }
+
+    async function reaccionar(mensajeId, emoji) {
+      const respuesta = await fetch(`/api/chat/mensajes/${mensajeId}/reacciones`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ emoji }),
+      });
+      if (!respuesta.ok) return;
+      const datos = await respuesta.json();
+      aplicarReacciones(datos.id, datos.reacciones);
+    }
+
+    function aplicarReacciones(mensajeId, reacciones) {
+      const ref = burbujasPorId.get(mensajeId);
+      if (!ref || ref.eliminado) return;
+      pintarReacciones(ref.reaccionesEl, reacciones, mensajeId);
+    }
+
+    function aplicarEdicion(mensajeId, texto) {
+      const ref = burbujasPorId.get(mensajeId);
+      if (!ref || ref.eliminado) return;
+      ref.contenidoTexto.textContent = texto;
+      ref.marcaEditado.hidden = false;
+      ref.cajaTexto.hidden = false;
+      ref.tieneTexto = true;
+    }
+
+    function aplicarEliminacionEnRef(ref) {
+      ref.eliminado = true;
+      ref.burbuja.classList.add("burbuja-eliminada");
+      ref.cajaTexto.hidden = false;
+      ref.contenidoTexto.textContent = "Mensaje eliminado";
+      ref.marcaEditado.hidden = true;
+      if (ref.imagenEl) {
+        ref.imagenEl.remove();
+        ref.imagenEl = null;
+      }
+      ref.reaccionesEl.hidden = true;
+      ref.reaccionesEl.innerHTML = "";
+      ref.btnAcciones.hidden = true;
+    }
+
+    function aplicarEliminacion(mensajeId) {
+      const ref = burbujasPorId.get(mensajeId);
+      if (ref) aplicarEliminacionEnRef(ref);
+    }
+
+    // Reemplaza el texto del mensaje por un textarea editable con
+    // Guardar/Cancelar, en vez de un prompt() del navegador (permite ver
+    // bien el texto largo y usar Enter para confirmar como en el resto del chat).
+    function iniciarEdicionInline(mensajeId) {
+      const ref = burbujasPorId.get(mensajeId);
+      if (!ref || ref.eliminado || document.querySelector(".chat-editar-inline")) return;
+
+      const valorActual = ref.contenidoTexto.textContent;
+      ref.cajaTexto.hidden = true;
+
+      const contenedor = document.createElement("div");
+      contenedor.className = "chat-editar-inline";
+      const input = document.createElement("textarea");
+      input.className = "chat-editar-input";
+      input.value = valorActual;
+      input.maxLength = 2000;
+      input.rows = Math.min(6, Math.max(1, valorActual.split("\n").length));
+      const botones = document.createElement("div");
+      botones.className = "chat-editar-botones";
+      const btnGuardar = document.createElement("button");
+      btnGuardar.type = "button";
+      btnGuardar.className = "chat-editar-guardar";
+      btnGuardar.textContent = "Guardar";
+      const btnCancelar = document.createElement("button");
+      btnCancelar.type = "button";
+      btnCancelar.className = "chat-editar-cancelar";
+      btnCancelar.textContent = "Cancelar";
+      botones.append(btnGuardar, btnCancelar);
+      contenedor.append(input, botones);
+      ref.cajaTexto.insertAdjacentElement("afterend", contenedor);
+      input.focus();
+      input.setSelectionRange(input.value.length, input.value.length);
+
+      const cerrar = () => {
+        contenedor.remove();
+        ref.cajaTexto.hidden = false;
+      };
+      btnCancelar.addEventListener("click", cerrar);
+      input.addEventListener("keydown", (evento) => {
+        if (evento.key === "Escape") cerrar();
+        if (evento.key === "Enter" && !evento.shiftKey) {
+          evento.preventDefault();
+          btnGuardar.click();
+        }
+      });
+      btnGuardar.addEventListener("click", async () => {
+        const texto = input.value.trim();
+        if (!texto) return alert("El mensaje no puede quedar vacío");
+        const respuesta = await fetch(`/api/chat/mensajes/${mensajeId}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ texto }),
+        });
+        if (!respuesta.ok) {
+          const error = await respuesta.json().catch(() => ({}));
+          alert(error.error || "No se pudo editar el mensaje");
+          return;
+        }
+        const datos = await respuesta.json();
+        aplicarEdicion(datos.id, datos.texto);
+        contenedor.remove();
+      });
+    }
+
+    async function eliminarMensaje(mensajeId) {
+      if (!confirm("¿Eliminar este mensaje? No se puede deshacer.")) return;
+      const respuesta = await fetch(`/api/chat/mensajes/${mensajeId}`, { method: "DELETE" });
+      if (!respuesta.ok) {
+        alert("No se pudo eliminar el mensaje");
+        return;
+      }
+      aplicarEliminacion(mensajeId);
+    }
+
+    function pintarMenuReaccionesRapidas() {
+      if (menuReaccionesRapidas.childElementCount > 0) return;
+      for (const emoji of REACCIONES_RAPIDAS) {
+        const boton = document.createElement("button");
+        boton.type = "button";
+        boton.textContent = emoji;
+        boton.addEventListener("click", () => {
+          if (menuMensajeActualId) reaccionar(menuMensajeActualId, emoji);
+          cerrarMenuAcciones();
+        });
+        menuReaccionesRapidas.appendChild(boton);
+      }
+    }
+
+    // Un solo popup compartido (en vez de uno por burbuja) que se reposiciona
+    // según el botón "⋮" que se tocó. Muestra Editar/Eliminar solo si
+    // corresponde (mensaje propio, con texto, no eliminado).
+    function abrirMenuAcciones(mensajeId, boton) {
+      const ref = burbujasPorId.get(mensajeId);
+      if (!ref || ref.eliminado) return;
+      menuMensajeActualId = mensajeId;
+      pintarMenuReaccionesRapidas();
+      btnMenuEditar.hidden = !(ref.esPropio && ref.tieneTexto);
+      btnMenuEliminar.hidden = !ref.esPropio;
+      menuAccionesMensaje.hidden = false;
+
+      const rect = boton.getBoundingClientRect();
+      const alto = menuAccionesMensaje.offsetHeight || 170;
+      const ancho = menuAccionesMensaje.offsetWidth || 210;
+      menuAccionesMensaje.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - ancho - 8)) + "px";
+      menuAccionesMensaje.style.top =
+        (rect.bottom + alto > window.innerHeight ? rect.top - alto - 4 : rect.bottom + 4) + "px";
+    }
+
+    function cerrarMenuAcciones() {
+      menuAccionesMensaje.hidden = true;
+      menuMensajeActualId = null;
+    }
+
+    btnMenuEditar.addEventListener("click", () => {
+      const id = menuMensajeActualId;
+      cerrarMenuAcciones();
+      if (id) iniciarEdicionInline(id);
+    });
+
+    btnMenuEliminar.addEventListener("click", () => {
+      const id = menuMensajeActualId;
+      cerrarMenuAcciones();
+      if (id) eliminarMensaje(id);
+    });
+
+    document.addEventListener("click", (evento) => {
+      if (!menuAccionesMensaje.hidden && !menuAccionesMensaje.contains(evento.target)) {
+        cerrarMenuAcciones();
+      }
+    });
 
     async function actualizarVistos() {
       if (!conversacionActualId || burbujasPropiasSinVisto.size === 0) return;
@@ -296,6 +566,8 @@
       ultimoMensajeId = 0;
       chatMensajes.innerHTML = "";
       burbujasPropiasSinVisto.clear();
+      burbujasPorId.clear();
+      cerrarMenuAcciones();
       const conversacion = conversaciones.find((c) => c.id === id);
       chatPanelHeader.textContent = conversacion ? tituloConversacion(conversacion) : "";
       chatPanelSubtitulo.textContent = conversacion ? subtituloPresencia(conversacion) : "";
@@ -369,6 +641,15 @@
       socket.on("mensajeNuevo", manejarMensajeNuevoSocket);
       socket.on("lecturaActualizada", (payload) => {
         if (payload.conversacionId === conversacionActualId) actualizarVistos();
+      });
+      socket.on("mensajeEditado", (datos) => {
+        if (datos.conversacionId === conversacionActualId) aplicarEdicion(datos.id, datos.texto);
+      });
+      socket.on("mensajeEliminado", (datos) => {
+        if (datos.conversacionId === conversacionActualId) aplicarEliminacion(datos.id);
+      });
+      socket.on("reaccionesActualizadas", (datos) => {
+        if (datos.conversacionId === conversacionActualId) aplicarReacciones(datos.id, datos.reacciones);
       });
       // Grupo/DM nuevo en el que me incluyeron: refresca la lista para que
       // aparezca sin esperar el sondeo de conversaciones (10s).
@@ -603,6 +884,8 @@
 
       chatMensajes.innerHTML = "";
       ultimoMensajeId = 0;
+      burbujasPorId.clear();
+      burbujasPropiasSinVisto.clear();
       cargarConversaciones();
     });
 

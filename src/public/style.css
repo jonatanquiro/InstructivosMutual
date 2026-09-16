@@ -1482,6 +1482,161 @@ body.modo-presentacion .filtros-proyectos {
 
 .chat-mensajes .burbuja {
   max-width: 70%;
+  position: relative;
+  padding-right: 1.9rem;
+}
+
+.chat-btn-acciones {
+  position: absolute;
+  top: 0.25rem;
+  right: 0.35rem;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.55;
+  cursor: pointer;
+  font-size: 0.95rem;
+  line-height: 1;
+  padding: 0.1rem 0.25rem;
+  border-radius: 4px;
+}
+
+.chat-btn-acciones:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.chat-editado-marca {
+  font-size: 0.7rem;
+  opacity: 0.65;
+  font-style: italic;
+}
+
+.burbuja-eliminada .chat-texto-contenido {
+  font-style: italic;
+  opacity: 0.7;
+}
+
+.chat-reacciones {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.35rem;
+}
+
+.chat-reaccion-pill {
+  border: 1px solid var(--borde);
+  background: var(--superficie);
+  color: var(--texto);
+  border-radius: 12px;
+  padding: 0.05rem 0.45rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.chat-reaccion-pill.propia {
+  border-color: var(--verde);
+  background: var(--verde-claro);
+}
+
+.chat-editar-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.2rem;
+}
+
+.chat-editar-input {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  color: var(--texto);
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  padding: 0.4rem 0.55rem;
+}
+
+.chat-editar-botones {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.chat-editar-guardar,
+.chat-editar-cancelar {
+  border: none;
+  border-radius: 14px;
+  padding: 0.25rem 0.7rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.chat-editar-guardar {
+  background: var(--verde);
+  color: white;
+}
+
+.chat-editar-cancelar {
+  background: transparent;
+  color: inherit;
+  border: 1px solid currentColor;
+  opacity: 0.8;
+}
+
+.chat-menu-acciones {
+  position: fixed;
+  z-index: 40;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  padding: 0.5rem;
+  min-width: 190px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.chat-menu-reacciones {
+  display: flex;
+  justify-content: space-between;
+  padding: 0.2rem 0.1rem 0.5rem;
+  border-bottom: 1px solid var(--borde);
+  margin-bottom: 0.2rem;
+}
+
+.chat-menu-reacciones button {
+  border: none;
+  background: transparent;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 0.1rem 0.2rem;
+  border-radius: 6px;
+}
+
+.chat-menu-reacciones button:hover {
+  background: var(--verde-claro);
+}
+
+.chat-menu-item {
+  border: none;
+  background: transparent;
+  color: var(--texto);
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.chat-menu-item:hover {
+  background: var(--verde-claro);
+}
+
+.chat-menu-item-peligro:hover {
+  background: #fbe3e1;
+  color: #e0483f;
 }
 
 .chat-autor {
