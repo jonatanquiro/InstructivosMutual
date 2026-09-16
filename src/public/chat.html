@@ -32,7 +32,10 @@
             <button type="button" id="btnNuevoGrupo" class="btn-nuevo-chat" title="Nuevo grupo">+ Grupo</button>
           </div>
         </div>
-        <div id="pickerUsuarios" class="chat-picker-usuarios" hidden></div>
+        <div id="pickerUsuarios" class="chat-picker-usuarios" hidden>
+          <input type="text" id="inputBuscarUsuario" class="chat-input-buscar-usuario" placeholder="Buscar persona…" />
+          <div id="listaPickerUsuarios"></div>
+        </div>
         <div id="pickerGrupo" class="chat-picker-usuarios chat-picker-grupo" hidden>
           <input type="text" id="inputNombreGrupo" class="chat-input-nombre-grupo" placeholder="Nombre del grupo" maxlength="150" />
           <div id="listaCheckboxesGrupo" class="chat-lista-checkboxes"></div>
@@ -120,6 +123,8 @@
     const nombreImagenElegida = document.getElementById("nombreImagenElegida");
     const btnNuevoChat = document.getElementById("btnNuevoChat");
     const pickerUsuarios = document.getElementById("pickerUsuarios");
+    const inputBuscarUsuario = document.getElementById("inputBuscarUsuario");
+    const listaPickerUsuarios = document.getElementById("listaPickerUsuarios");
     const btnNuevoGrupo = document.getElementById("btnNuevoGrupo");
     const pickerGrupo = document.getElementById("pickerGrupo");
     const inputNombreGrupo = document.getElementById("inputNombreGrupo");
@@ -245,6 +250,13 @@
     }
 
     function agregarMensaje(mensaje) {
+      // Idempotente por id: el mensaje propio puede llegar dos veces (la
+      // respuesta HTTP del POST y el broadcast "mensajeNuevo" por socket,
+      // que también le llega a quien lo mandó) y no siempre en el mismo
+      // orden, así que compararlo contra ultimoMensajeId no alcanza para
+      // evitar el duplicado. Esto es lo único que hace falta chequear.
+      if (burbujasPorId.has(mensaje.id)) return;
+
       const burbuja = document.createElement("div");
       const esPropio = mensaje.usuario_id === usuarioId;
       burbuja.className = "burbuja " + (esPropio ? "burbuja-usuario" : "burbuja-bot");
@@ -625,8 +637,7 @@
         cargarConversaciones();
         return;
       }
-      if (mensaje.id <= ultimoMensajeId) return; // ya lo agregamos por REST/polling
-      agregarMensaje(mensaje);
+      agregarMensaje(mensaje); // agregarMensaje ya ignora los que estén repetidos
       scrollAbajo();
       if (mensaje.usuario_id !== usuarioId) {
         avisarMensajeNuevo();
@@ -737,9 +748,14 @@
       nombreImagenElegida.hidden = true;
     });
 
+    let enviandoMensaje = false;
+
     formEnviar.addEventListener("submit", async (evento) => {
       evento.preventDefault();
-      if (!conversacionActualId) return;
+      // Sin esto, un doble Enter/doble tap rápido (algo bastante común en
+      // celular) manda dos POST reales y quedan dos mensajes iguales, no un
+      // problema de pintado sino dos filas distintas en la base.
+      if (!conversacionActualId || enviandoMensaje) return;
 
       const texto = inputTexto.value.trim();
       const archivo = inputImagen.files[0];
@@ -749,28 +765,33 @@
       if (texto) datos.append("texto", texto);
       if (archivo) datos.append("imagen", archivo);
 
-      const respuesta = await fetch(`/api/chat/conversaciones/${conversacionActualId}/mensajes`, {
-        method: "POST",
-        body: datos,
-      });
+      enviandoMensaje = true;
+      try {
+        const respuesta = await fetch(`/api/chat/conversaciones/${conversacionActualId}/mensajes`, {
+          method: "POST",
+          body: datos,
+        });
 
-      if (respuesta.status === 401) {
-        window.location.href = "/login.html";
-        return;
-      }
-      if (!respuesta.ok) {
-        const error = await respuesta.json().catch(() => ({}));
-        alert(error.error || "No se pudo enviar el mensaje");
-        return;
-      }
+        if (respuesta.status === 401) {
+          window.location.href = "/login.html";
+          return;
+        }
+        if (!respuesta.ok) {
+          const error = await respuesta.json().catch(() => ({}));
+          alert(error.error || "No se pudo enviar el mensaje");
+          return;
+        }
 
-      const mensaje = await respuesta.json();
-      agregarMensaje(mensaje);
-      scrollAbajo();
-      inputTexto.value = "";
-      inputImagen.value = "";
-      nombreImagenElegida.hidden = true;
-      cargarConversaciones();
+        const mensaje = await respuesta.json();
+        agregarMensaje(mensaje);
+        scrollAbajo();
+        inputTexto.value = "";
+        inputImagen.value = "";
+        nombreImagenElegida.hidden = true;
+        cargarConversaciones();
+      } finally {
+        enviandoMensaje = false;
+      }
     });
 
     btnNuevoChat.addEventListener("click", async () => {
@@ -781,14 +802,16 @@
       }
       const respuesta = await fetch("/api/chat/usuarios");
       const usuarios = await respuesta.json();
-      pickerUsuarios.innerHTML = "";
+      listaPickerUsuarios.innerHTML = "";
+      inputBuscarUsuario.value = "";
       if (usuarios.length === 0) {
-        pickerUsuarios.innerHTML = "<div class='chat-picker-vacio'>No hay otros usuarios activos</div>";
+        listaPickerUsuarios.innerHTML = "<div class='chat-picker-vacio'>No hay otros usuarios activos</div>";
       }
       for (const usuario of usuarios) {
         const item = document.createElement("button");
         item.type = "button";
         item.className = "chat-picker-item";
+        item.dataset.nombre = usuario.nombre_completo.toLowerCase();
         item.innerHTML =
           avatarHtml(usuario.foto_url, usuario.nombre_completo, true) +
           `<span>${usuario.en_linea ? "🟢 " : ""}${usuario.nombre_completo}</span>`;
@@ -803,9 +826,19 @@
           await cargarConversaciones();
           abrirConversacion(datos.id);
         });
-        pickerUsuarios.appendChild(item);
+        listaPickerUsuarios.appendChild(item);
       }
       pickerUsuarios.hidden = false;
+      inputBuscarUsuario.focus();
+    });
+
+    // Filtra la lista de "+ Chat" a medida que se escribe, sin volver a
+    // pedirle la lista al servidor (ya la tenemos toda pintada en el DOM).
+    inputBuscarUsuario.addEventListener("input", () => {
+      const filtro = inputBuscarUsuario.value.trim().toLowerCase();
+      for (const item of listaPickerUsuarios.querySelectorAll(".chat-picker-item")) {
+        item.hidden = filtro.length > 0 && !item.dataset.nombre.includes(filtro);
+      }
     });
 
     btnNuevoGrupo.addEventListener("click", async () => {

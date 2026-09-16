@@ -1340,6 +1340,21 @@ body.modo-presentacion .filtros-proyectos {
   flex-shrink: 0;
 }
 
+.chat-input-buscar-usuario {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.8rem;
+  border: none;
+  border-bottom: 1px solid var(--borde);
+  background: var(--superficie);
+  color: var(--texto);
+  font-family: inherit;
+  font-size: 0.85rem;
+}
+
 .chat-picker-item {
   display: flex;
   align-items: center;
