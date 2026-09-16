@@ -835,9 +835,14 @@
     // Filtra la lista de "+ Chat" a medida que se escribe, sin volver a
     // pedirle la lista al servidor (ya la tenemos toda pintada en el DOM).
     inputBuscarUsuario.addEventListener("input", () => {
+      // Con item.hidden no alcanza: .chat-picker-item tiene "display: flex"
+      // en el CSS, y esa regla de autor le gana al [hidden] del navegador
+      // (misma especificidad), así que el atributo no ocultaba nada. Con
+      // style.display no hay ese conflicto.
       const filtro = inputBuscarUsuario.value.trim().toLowerCase();
       for (const item of listaPickerUsuarios.querySelectorAll(".chat-picker-item")) {
-        item.hidden = filtro.length > 0 && !item.dataset.nombre.includes(filtro);
+        const coincide = !filtro || item.dataset.nombre.includes(filtro);
+        item.style.display = coincide ? "" : "none";
       }
     });
 
