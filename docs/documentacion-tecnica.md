@@ -8,7 +8,7 @@
 > Para una descripción de qué hace la app desde el punto de vista de un usuario, ver
 > [funcionamiento-general.md](./funcionamiento-general.md).
 >
-> Última actualización: 2026-09-16.
+> Última actualización: 2026-09-18.
 
 ## Stack y arranque
 
@@ -212,11 +212,12 @@ solo-polling. Sigue habiendo un límite real: con el navegador **cerrado** no ll
 notificación de sistema operativo) — eso solo se resuelve con Push API + Service Worker, que
 además requiere HTTPS (hoy la app corre HTTP plano en la intranet), así que queda pendiente.
 
-**Contador en el título de la pestaña**: `chat.html` e `index.html` actualizan
-`document.title` a `"Información Mutual (N)"` mientras haya N mensajes sin leer en otras
-conversaciones (estilo Facebook viejo), en vez del parpadeo que había antes. Se recalcula cada
-vez que se refresca la lista de conversaciones (por sondeo o por los eventos de socket de
-arriba), así que también funciona con la pestaña de fondo.
+**Contador en el título de la pestaña**: `chat.html` actualiza `document.title` a
+`"Información Mutual (N)"` mientras haya N mensajes sin leer en otras conversaciones (estilo
+Facebook viejo), en vez del parpadeo que había antes. Se recalcula cada vez que se refresca la
+lista de conversaciones (por sondeo o por los eventos de socket de arriba), así que también
+funciona con la pestaña de fondo. En el resto de las páginas, el mismo comportamiento (título +
+beep + badges) lo maneja `chat-flotante.js` — ver detalle en `src/public/` más abajo.
 
 ## src/public/ — frontend (HTML + JS + CSS planos, sin build ni framework)
 
@@ -225,12 +226,16 @@ arriba), así que también funciona con la pestaña de fondo.
   confirmación del servidor — por eso cada HTML tiene además un script inline en el `<head>`
   que lee `localStorage` de forma síncrona antes de pintar), conecta el botón de "Cerrar
   sesión" (`POST /api/auth/logout`) y completa el saludo con `GET /api/auth/me`, incluyendo el
-  avatar (`fotoUrl`) si el usuario cargó una foto de perfil.
+  avatar (`fotoUrl`) si el usuario cargó una foto de perfil. También inyecta dinámicamente
+  `<script src="/chat-flotante.js">` (`document.createElement("script")` +
+  `document.body.appendChild`) en cualquier página salvo `chat.html`, que ya tiene su propia
+  experiencia completa — ver detalle de `chat-flotante.js` más abajo.
 - **login.html**: formulario de usuario/contraseña contra `POST /api/auth/login`.
 - **index.html**: menú principal, tarjetas hacia el resto de las pantallas (oculta las de
-  admin según `GET /api/auth/me`), tarjeta de cumpleaños, y polling cada 3s a
-  `/api/chat/conversaciones` para el badge de no leídos + beep, pausado si la pestaña está
-  oculta.
+  admin según `GET /api/auth/me`), tarjeta de cumpleaños, y la tarjeta de "Chat" con badge
+  numérico de no leídos (`#badgeChatNoLeidos`) — el sondeo, el beep y la actualización de ese
+  badge los hace `chat-flotante.js` desde afuera (busca esos IDs en el DOM si existen), index.html
+  no tiene lógica propia de chat.
 - **preguntas.html**: pantalla de preguntas frecuentes (árbol de opciones, no IA) — módulos vía
   `GET /api/modulos`, registra cada consulta vista con `POST /api/preguntas/:id/consulta`.
 - **chat.html**: chat interno completo (ver detalle en `chat.routes.js` de arriba). En celular
@@ -246,6 +251,49 @@ arriba), así que también funciona con la pestaña de fondo.
   (`pintarListaConversaciones`), el nombre de cada mensaje ajeno (`agregarMensaje`) y los
   buscadores de "+ Chat"/"+ Grupo" — todos consumen el `foto_url`/`otro_foto_url` que ya viene
   en la respuesta de `chat.routes.js`, no piden nada aparte.
+- **chat-flotante.js** (inyectado por `comun.js` en toda página salvo `chat.html`): la barra de
+  chat flotante estilo "viejo Facebook" (Messenger de escritorio) — avisa mensajes nuevos sin
+  tener que estar en `/chat.html`, con ventanitas propias para responder al toque. Es un único
+  IIFE autocontenido, sin dependencias del HTML de la página donde corre (arma todo su DOM por
+  JS y lo appendea a `document.body`).
+  - **Layout**: un botón lanzador circular (`.cf-launcher`, 💬 con badge de total no leídos) fijo
+    abajo a la derecha (`.cf-barra`). Al clickearlo despliega `.cf-panel-lista`, un flyout con
+    todas las conversaciones (mismo formato que la lista de `chat.html`: avatar, título, preview,
+    punto verde de en línea, badge de no leídos) y un link "Ver todos los mensajes →" a
+    `/chat.html`. Clickear una fila abre/crea su ventanita.
+  - **Ventanitas (`.cf-item`)**: cada conversación abierta es una tira con el nombre siempre
+    visible (`.cf-item-header`), que se expande hacia arriba con `flex-direction: column-reverse`
+    en vez de mover la tira de lugar. Minimizada, solo se ve esa tira. Si llega un mensaje nuevo
+    estando minimizada, la tira se pinta de rojo con un pulso (clase `.cf-nuevo`) — el "cambio de
+    color" en vez de mostrar el contenido. Expandida, se ven los últimos mensajes
+    (`GET /chat/conversaciones/:id/mensajes`, que de paso marca como leído) y hay un input propio
+    para responder (`POST /chat/conversaciones/:id/mensajes`, solo texto — sin adjuntar imagen,
+    emojis, editar ni reaccionar: eso sigue siendo exclusivo de `chat.html`).
+  - **Persistencia entre páginas**: como esto no es una SPA (cada `.html` es una carga nueva), qué
+    ventanitas están abiertas/minimizadas se guarda en `localStorage`
+    (`chatFlotanteVentanas`, array de `{id, minimizada}`) y se reconstruye al cargar cada página
+    (`restaurarEstado()`), así no desaparecen al navegar de una pantalla a otra.
+  - **Límite de ventanas**: como mucho `MAX_VENTANAS_ABIERTAS` (3) al mismo tiempo — al abrir una
+    de más se cierra la minimizada más vieja (nunca una que el usuario tenga expandida en ese
+    momento), para no llenar la pantalla de tiras.
+  - **Tiempo real y sondeo**: se suscribe a los mismos eventos de socket que `chat.html`
+    (`mensajeNuevo`, `conversacionNueva`), cargando `/socket.io/socket.io.js` dinámicamente si
+    hace falta (mismo patrón que tenía antes el globo simple de `comun.js`). Sondea
+    `/api/chat/conversaciones` cada 5s de respaldo, y cada ventanita expandida sondea sus propios
+    mensajes nuevos cada 3s mientras esté abierta (se corta el intervalo al minimizarla, para no
+    pedir de más).
+  - **Un solo origen para el beep**: para no sonar dos veces por el mismo mensaje, el beep de
+    "ventana expandida mirando la conversación en el momento" sale directo del handler del socket
+    (igual que en `chat.html`), y el beep de "subió el total de no leídos en otra conversación"
+    sale de `cargarConversaciones()` comparando contra la carga anterior — pero esa comparación
+    **excluye** las conversaciones con ventana expandida (`totalNoLeidoRelevante()`), así ninguna
+    conversación puede disparar los dos beeps a la vez.
+  - **Cuidado con `hidden` + CSS de autor**: igual que ya pasó una vez con `.chat-picker-item`
+    (ver más abajo), si una regla de autor le pone `display` a un elemento que se esconde con el
+    atributo `hidden`, esa regla le gana al `[hidden]` del navegador aunque tengan la misma
+    especificidad (el origen "autor" siempre le gana al "user agent"). Por eso `.cf-panel-lista`
+    tiene el `display: flex` en una regla aparte `.cf-panel-lista:not([hidden])`, no en la
+    regla base.
 - **configuracion.html**: selector de tema claro/oscuro (`GET/PUT /api/config`) + sección
   "Datos personales" (foto, teléfono, email, fecha de nacimiento) contra los endpoints de
   `config.routes.js` descriptos arriba. La foto se manda apenas se elige el archivo (sin botón
@@ -265,7 +313,10 @@ arriba), así que también funciona con la pestaña de fondo.
 - **style.css**: variables CSS de tema (`--verde`, `--bg`, `--texto`, etc.), tema claro por
   default con overrides bajo `:root[data-theme="oscuro"]`. Organizado en bloques comentados por
   pantalla (Login, Menú principal, Preguntas frecuentes, Usuarios, BCRA, Configuración, Chat
-  de preguntas, Panel admin FAQ, Proyectos, Modo Presentación, Chat interno).
+  de preguntas, Panel admin FAQ, Proyectos, Modo Presentación, Chat interno, Chat flotante). El
+  bloque "Chat flotante" (clases `.cf-*`) es el único que no vive dentro de una sola pantalla:
+  se aplica en todas las páginas salvo `chat.html`, reusando las mismas variables de tema (nada
+  de colores hardcodeados) para que la barra y las ventanitas respeten claro/oscuro solas.
 
 ## src/uploads/
 

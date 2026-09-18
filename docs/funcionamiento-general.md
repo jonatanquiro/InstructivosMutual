@@ -4,7 +4,7 @@
 > (para eso está [documentacion-tecnica.md](./documentacion-tecnica.md)). Se debe actualizar
 > cada vez que se agrega o cambia una funcionalidad visible para el usuario.
 >
-> Última actualización: 2026-09-16.
+> Última actualización: 2026-09-18.
 
 ## Qué es
 
@@ -32,7 +32,8 @@ abierto: si el usuario cierra el navegador, tiene que volver a loguearse.
 Es la pantalla de aterrizaje después de loguearse. Muestra tarjetas de acceso a cada sección,
 un saludo con el nombre del usuario, la tarjeta de "próximos cumpleaños" de directivos, y un
 aviso (con contador y sonido) cuando hay mensajes de chat sin leer, aunque el usuario no esté
-en la pantalla del chat.
+en la pantalla del chat — este último aviso en realidad aparece en **cualquier pantalla**, no
+solo en el menú (ver "Barra de chat flotante" más abajo).
 
 ## Preguntas frecuentes ("Información")
 
@@ -82,6 +83,28 @@ de la pestaña, tipo "Información Mutual (3)", como el Facebook viejo.
 - En celular, la pantalla de chat funciona como WhatsApp: se ve la lista de conversaciones a
   pantalla completa, y al tocar una se abre esa conversación a pantalla completa con una flecha
   para volver a la lista.
+
+### Barra de chat flotante (estilo Facebook viejo)
+
+Desde septiembre de 2026, mientras se navega por cualquier pantalla que no sea el chat completo
+(Información, Enlaces, Proyectos, Configuración, etc.) aparece abajo a la derecha un botón 💬
+con el total de mensajes sin leer. Al tocarlo se despliega la lista de conversaciones (igual que
+la del chat, con avatar, último mensaje y punto verde de "en línea"), y elegir una abre una
+ventanita de chat flotante abajo de la pantalla, sin necesidad de ir a la pantalla completa del
+chat — se puede leer y responder mensajes de texto desde ahí mismo.
+
+- **Minimizada**: solo se ve una tira angosta con el nombre. Si llega un mensaje nuevo mientras
+  está así, la tira cambia de color (rojo, con un pulso) para avisar, pero no muestra el
+  contenido del mensaje hasta que se abre.
+- **Expandida**: se ve la conversación y se puede escribir y mandar mensajes de texto
+  directamente. No tiene emojis, adjuntar imagen, editar ni reaccionar — para eso hay que ir al
+  chat completo (el link "Ver todos los mensajes →" en la lista lleva directo).
+- Se pueden tener hasta 3 ventanitas abiertas a la vez; si se abre una cuarta, se cierra sola la
+  minimizada más antigua (nunca una que se esté mirando en ese momento).
+- Las ventanitas que se dejaron abiertas quedan así al navegar a otra pantalla (se guardan en el
+  navegador), así no hay que volver a abrirlas cada vez que se cambia de página.
+- No aparece en la pantalla de chat completo (`/chat.html`), porque ahí ya se ve todo con más
+  detalle — solaparía el mismo aviso dos veces.
 
 ## Cumpleaños
 
@@ -146,3 +169,7 @@ Estos son puntos comentados pero todavía no resueltos, para no perderlos de vis
   pueden dejar preparados en cualquier momento sin que dependa de eso.
 - GIFs/stickers en el chat: descartado por ahora (no vale la pena el esfuerzo de sumar un
   servicio externo tipo GIPHY, o mantener un set fijo de imágenes propio, para lo que aporta).
+- Panel de "usuarios conectados" a la vista (tipo la lista de contactos online que tenía el
+  Facebook viejo a la derecha): quedó afuera de la barra de chat flotante a propósito, para una
+  eventual segunda vuelta. El dato de presencia ya existe (`estaEnLinea()` en `presencia.js`) y
+  ya se usa como punto verde en listas puntuales — falta nada más que un panel dedicado.
