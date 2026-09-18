@@ -80,7 +80,6 @@
   </footer>
 
   <script src="/comun.js"></script>
-  <script src="/socket.io/socket.io.js"></script>
   <script>
     async function mostrarTarjetaUsuariosSiAdmin() {
       try {
@@ -121,79 +120,9 @@
 
     cargarCumples();
 
-    let noLeidosChatPrevio = 0;
-    let primeraCargaNoLeidosChat = true;
-    let intervaloNoLeidosChat = null;
-    const tituloOriginal = document.title;
-
-    // Título tipo "viejo Facebook": mientras haya no leídos, se ve el
-    // número en la pestaña aunque no se esté mirando esta pantalla.
-    function actualizarTituloNoLeidos(total) {
-      document.title = total > 0 ? `${tituloOriginal} (${total > 99 ? "99+" : total})` : tituloOriginal;
-    }
-
-    function reproducirBeep() {
-      try {
-        const contexto = new (window.AudioContext || window.webkitAudioContext)();
-        const oscilador = contexto.createOscillator();
-        const volumen = contexto.createGain();
-        oscilador.frequency.value = 880;
-        volumen.gain.setValueAtTime(0.15, contexto.currentTime);
-        volumen.gain.exponentialRampToValueAtTime(0.001, contexto.currentTime + 0.25);
-        oscilador.connect(volumen).connect(contexto.destination);
-        oscilador.start();
-        oscilador.stop(contexto.currentTime + 0.25);
-      } catch (error) {
-        // Si el navegador todavía no permite audio (sin interacción previa
-        // del usuario), no rompemos nada: simplemente no suena.
-      }
-    }
-
-    async function cargarNoLeidosChat() {
-      try {
-        const respuesta = await fetch("/api/chat/conversaciones");
-        if (!respuesta.ok) return;
-        const conversaciones = await respuesta.json();
-        const total = conversaciones.reduce((suma, c) => suma + (c.no_leidos || 0), 0);
-
-        const badge = document.getElementById("badgeChatNoLeidos");
-        const titulo = document.getElementById("tituloChat");
-        badge.hidden = total === 0;
-        titulo.classList.toggle("tiene-no-leidos", total > 0);
-        if (total > 0) badge.textContent = total > 9 ? "9+" : total;
-
-        // No avisamos en la primerísima carga: si ya tenías mensajes sin
-        // leer de antes, no tiene sentido que suene apenas entrás.
-        if (!primeraCargaNoLeidosChat && total > noLeidosChatPrevio) reproducirBeep();
-        noLeidosChatPrevio = total;
-        primeraCargaNoLeidosChat = false;
-        actualizarTituloNoLeidos(total);
-      } catch (error) {
-        // Si falla, la tarjeta de Chat queda como siempre, sin badge.
-      }
-    }
-
-    function iniciarPollingNoLeidosChat() {
-      if (intervaloNoLeidosChat) clearInterval(intervaloNoLeidosChat);
-      // Sondeo de respaldo nomás: el aviso "de verdad" llega por socket
-      // (más abajo) apenas se manda un mensaje, sin depender de este tick
-      // ni de que la pestaña esté en primer plano.
-      intervaloNoLeidosChat = setInterval(cargarNoLeidosChat, 3000);
-    }
-
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "visible") cargarNoLeidosChat();
-    });
-
-    // No hace falta saber el usuarioId acá: el servidor identifica al
-    // usuario por la cookie de sesión al conectar el socket, y lo suma
-    // solo a las salas de sus propias conversaciones.
-    const socket = io();
-    socket.on("mensajeNuevo", cargarNoLeidosChat);
-    socket.on("conversacionNueva", cargarNoLeidosChat);
-
-    cargarNoLeidosChat();
-    iniciarPollingNoLeidosChat();
+    // El badge y el título de "no leídos" de la tarjeta de Chat (además del
+    // sonido) los actualiza ahora chat-flotante.js (cargado desde
+    // comun.js), que ya hace ese sondeo para la barra de chat flotante.
   </script>
 </body>
 </html>
