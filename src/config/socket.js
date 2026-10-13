@@ -1,6 +1,7 @@
 const { Server } = require("socket.io");
 const { sql, getPool } = require("./db");
 const { registrarActividad } = require("./presencia");
+const { chatActivo } = require("./ajustes");
 const { verificarAcceso, marcarLeido } = require("../routes/chat-datos");
 
 // Instancia única del server de sockets, seteada recién en inicializar().
@@ -36,6 +37,8 @@ async function unirseASusConversaciones(socket, usuarioId) {
 function inicializar(servidorHttp, sessionMiddleware) {
   io = new Server(servidorHttp);
   io.engine.use(sessionMiddleware);
+  // Con el chat apagado (Configuración, admin) no se aceptan conexiones.
+  io.use(async (socket, next) => (await chatActivo() ? next() : next(new Error("El chat está desactivado"))));
 
   io.on("connection", (socket) => {
     const usuarioId = socket.request.session?.usuarioId;

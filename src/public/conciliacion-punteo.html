@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Punteo — Conciliación bancaria</title>
+  <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
+  <script>
+    (function () {
+      var t = localStorage.getItem("tema");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-izq">
+      <img src="/img/logo-blanco.png" alt="Logo Mutual" class="logo-barra" />
+      <h1 id="titulo">Punteo</h1>
+      <span class="saludo" id="saludo"></span>
+    </div>
+  </header>
+
+  <main class="conc-main">
+    <div id="avisos" class="conc-avisos"></div>
+
+    <div id="contenido" hidden>
+      <div class="conc-barra-mes">
+        <p class="conc-subtitulo" id="subtitulo"></p>
+        <div class="conc-acciones-mes">
+          <a class="conc-boton secundario" id="linkInforme" target="_blank">🖨 Informe para auditoría</a>
+          <button type="button" class="conc-boton" id="btnCerrarMes" hidden>🔒 Cerrar el mes</button>
+          <button type="button" class="conc-boton secundario" id="btnReabrirMes" hidden>Reabrir el mes</button>
+        </div>
+      </div>
+
+      <div class="conc-resumen" id="resumen"></div>
+
+      <details class="conc-saldos">
+        <summary>Control de saldos</summary>
+        <table id="tablaSaldos"></table>
+      </details>
+
+      <p class="conc-ayuda conc-ayuda-punteo">
+        Para conciliar a mano, tildá los renglones pendientes de cada lado (por ejemplo 1 del mayor y 3 del
+        banco) y tocá <strong>✓ Conciliar</strong>. Tocá el <strong>✓</strong> o el <strong>?</strong> del
+        medio para aceptar, rechazar o deshacer un cruce.
+      </p>
+
+      <div class="conc-filtros">
+        <label><input type="radio" name="filtro" value="todo" checked /> Todo</label>
+        <label><input type="radio" name="filtro" value="no-cierra" /> Sólo lo que no cierra</label>
+        <label><input type="radio" name="filtro" value="confirmar" /> Para confirmar</label>
+        <label><input type="radio" name="filtro" value="sin-revisar" /> Pendientes sin revisar</label>
+        <label title="Ingresos del banco cuyo CUIT no figura en la base de socios">
+          <input type="radio" name="filtro" value="no-socios" /> Ingresos de no socios
+        </label>
+        <label><input type="checkbox" id="verGastos" /> Mostrar gastos e impuestos del banco</label>
+        <input type="search" id="buscar" placeholder="Buscar importe o texto…" />
+      </div>
+
+      <div class="conc-punteo-scroll">
+        <table class="conc-punteo" id="punteo">
+          <thead>
+            <tr class="conc-lados">
+              <th colspan="5">Mayor de la mutual</th>
+              <th></th>
+              <th colspan="4">Resumen del banco</th>
+            </tr>
+            <tr>
+              <th>Fecha</th><th>Concepto</th><th>Asiento</th><th class="num">Debe</th><th class="num">Haber</th>
+              <th></th>
+              <th>Fecha</th><th>Concepto</th><th class="num">Crédito</th><th class="num">Débito</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+
+  <!-- Panel lateral: detalle de un movimiento, sugerencias, revisado y observaciones -->
+  <aside class="conc-panel" id="panel" hidden>
+    <button type="button" class="conc-panel-cerrar" id="btnCerrarPanel" title="Cerrar">✕</button>
+    <div id="panelContenido"></div>
+  </aside>
+
+  <!-- Barra de lo tildado: suma de cada lado, diferencia y botón Conciliar -->
+  <div class="conc-seleccion" id="barraSeleccion" hidden>
+    <div><span>Mayor</span><strong id="selMayor"></strong></div>
+    <div><span>Banco</span><strong id="selBanco"></strong></div>
+    <div><span>Diferencia</span><strong id="selDif"></strong></div>
+    <button type="button" id="btnSugerencias" class="secundario" hidden>🔍 Sugerencias y notas</button>
+    <button type="button" id="btnConciliar">✓ Conciliar</button>
+    <button type="button" id="btnLimpiar" class="secundario">Destildar todo</button>
+  </div>
+
+  <div class="conc-modal" id="modal" hidden>
+    <div class="conc-modal-caja">
+      <p id="modalTexto"></p>
+      <div class="conc-modal-botones" id="modalBotones"></div>
+    </div>
+  </div>
+
+  <footer class="barra-inferior">
+    <a href="/conciliacion.html" class="btn-inferior principal" id="linkVolver">◂ Volver a la grilla</a>
+    <button id="btnSalir" class="btn-inferior peligro">Cerrar sesión</button>
+  </footer>
+
+  <script src="/comun.js"></script>
+  <script src="/conciliacion-comun.js"></script>
+  <script>
+    const MOSTRAR_POR_LADO = 3; // en cruces grandes, cuántos renglones se ven sin desplegar
+    const DIAS = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+    const periodoId = Number(new URLSearchParams(location.search).get("id"));
+    const desplegados = new Set();
+    const tildados = new Set(); // ids de movimientos pendientes tildados para conciliar
+    let datos = null;
+    let bloques = [];
+    let movPorId = new Map();
+    let yaCargado = false;
+
+    async function cargar() {
+      try {
+        datos = await pedirJson(`/api/conciliacion/periodos/${periodoId}`);
+      } catch (error) {
+        mostrarAviso("error", error.message);
+        return;
+      }
+      movPorId = new Map(datos.movimientos.map((m) => [m.id, m]));
+      if (yaCargado) {
+        // Recarga después de conciliar/deshacer: sólo se repinta.
+        armarBloques();
+        pintarResumen();
+        pintarPunteo();
+        actualizarBarra();
+        if (panelMovimientoId) abrirPanel(panelMovimientoId);
+        return;
+      }
+      yaCargado = true;
+      const p = datos.periodo;
+      document.title = `${p.bancoNombre} ${NOMBRES_MES[p.mes - 1]} ${p.anio} — Punteo`;
+      document.getElementById("titulo").textContent = `${p.bancoNombre} — ${NOMBRES_MES[p.mes - 1]} ${p.anio}`;
+      document.getElementById("linkVolver").href = `/conciliacion.html?anio=${p.anio}`;
+      document.getElementById("subtitulo").textContent =
+        (p.cuenta ? `Cuenta del mayor: ${p.cuenta}. ` : "") +
+        (p.fechaProceso ? `Leído el ${new Date(p.fechaProceso).toLocaleString("es-AR")}` +
+          (p.procesadoPor ? ` por ${p.procesadoPor}` : "") + "." : "");
+
+      if (p.estado !== "abierto" && p.estado !== "cerrado") {
+        mostrarAviso("error", p.estado === "procesando"
+          ? "Este mes se está leyendo; volvé a abrirlo en un momento."
+          : `La última lectura no cerró: ${p.mensajeError || ""}`);
+        return;
+      }
+      if (datos.avisoAnterior) {
+        mostrarAviso("error", `${datos.avisoAnterior} Cargalo en la grilla, en el casillero "Banco" del mes anterior.`);
+      }
+      if (!p.hayAnterior) {
+        mostrarAviso("info", "No está cargado el resumen del mes anterior: los movimientos que el banco " +
+          "registró el mes pasado van a aparecer como pendientes.");
+      }
+      if (datos.deshechosRelectura?.length) {
+        // lado 'X' = movimiento que ya no está en el PDF nuevo
+        const detalle = datos.deshechosRelectura.map((c) => `n° ${c.numero} (${c.regla}): ` +
+          c.movimientos.map((m) => `${m.lado === "X" ? "ya no está" : esMayor(m) ? "mayor" : "banco"} ` +
+            `${fechaCorta(m.fecha).slice(0, 5)} ${m.concepto} $ ${importe(m.importe)}`).join("; ")).join(" | ");
+        mostrarAviso("info", `Al volver a leer los PDF se deshicieron ${datos.deshechosRelectura.length} ` +
+          `cruce(s) hechos a mano porque algún movimiento ya no está: ${detalle}. Sus otros movimientos ` +
+          "quedaron pendientes para volver a conciliarlos.");
+      }
+      if (datos.socios === null) {
+        mostrarAviso("info", "No se pudo consultar la base de socios: no se marca quién es socio.");
+      }
+      if (p.estado !== "abierto") document.querySelector(".conc-ayuda-punteo").hidden = true;
+      if (p.estado === "cerrado") {
+        mostrarAviso("info", `Mes cerrado${p.cerradoPor ? ` por ${p.cerradoPor}` : ""}` +
+          (p.fechaCierre ? ` el ${new Date(p.fechaCierre).toLocaleString("es-AR")}` : "") +
+          ". Sólo se puede consultar.");
+      }
+      document.getElementById("linkInforme").href = `/conciliacion-informe.html?id=${p.id}`;
+      document.getElementById("btnCerrarMes").hidden = !(p.estado === "abierto" && datos.permiso?.puedeCerrar);
+      document.getElementById("btnReabrirMes").hidden = !(p.estado === "cerrado" && datos.permiso?.esAdmin);
+
+      armarBloques();
+      pintarResumen();
+      pintarPunteo();
+      document.getElementById("contenido").hidden = false;
+    }
+
+    function etiquetaArrastre(m) {
+      if (m.lado !== "Q" && m.lado !== "R") return "";
+      return `<span class="conc-etiqueta conc-etiqueta-arrastre" title="Quedó pendiente al cerrar el mes anterior">pendiente de ${fechaCorta(m.fecha).slice(3)}</span> `;
+    }
+
+    // ---------- Armado de "bloques": un cruce, un pendiente suelto o los gastos de un día
+
+    function armarBloques() {
+      const porId = new Map(datos.movimientos.map((m) => [m.id, m]));
+      const cruzados = new Set();
+      const porFechaOrden = (a, b) => a.fecha.localeCompare(b.fecha) || a.orden - b.orden;
+      const suma = (lista) => lista.reduce((s, m) => s + Number(m.importe), 0);
+      bloques = [];
+
+      for (const c of datos.cruces) {
+        if (c.estado === "rechazado") continue; // sus movimientos vuelven a quedar pendientes
+        const items = c.items.map((id) => porId.get(id));
+        items.forEach((m) => cruzados.add(m.id));
+        const mayor = items.filter(esMayor).sort(porFechaOrden);
+        const banco = items.filter((m) => !esMayor(m)).sort(porFechaOrden);
+        const guia = mayor.length ? mayor : banco;
+        bloques.push({
+          // propuesta del sistema (no conciliada) / marcada "mes siguiente" / conciliada
+          tipo: c.estado === "a_confirmar" ? "confirmar" : c.estado === "mes_siguiente" ? "messig" : "ok",
+          cruce: c, mayor, banco,
+          fecha: guia[0].fecha,
+          importe: Math.abs(suma(guia)),
+        });
+      }
+
+      const gastosPorDia = new Map();
+      // Últimos días del resumen anterior que el motor no usó: se muestran para
+      // poder conciliarlos a mano con asientos de los primeros días (salvo que
+      // el mes anterior esté cerrado: ahí vienen como pendientes arrastrados).
+      const anterioresPorDia = new Map();
+      for (const m of datos.movimientos) {
+        if (cruzados.has(m.id)) continue;
+        if (m.lado === "A") {
+          if (!datos.cuadre.con_arrastre && Number(m.importe) !== 0) {
+            if (!anterioresPorDia.has(m.fecha)) anterioresPorDia.set(m.fecha, []);
+            anterioresPorDia.get(m.fecha).push(m);
+          }
+          continue;
+        }
+        if (Number(m.importe) === 0) continue; // renglones informativos del banco
+        if ((m.lado === "B" || m.lado === "Q") && m.rubro_gasto) {
+          if (!gastosPorDia.has(m.fecha)) gastosPorDia.set(m.fecha, []);
+          gastosPorDia.get(m.fecha).push(m);
+          continue;
+        }
+        bloques.push({
+          tipo: "pendiente",
+          mayor: esMayor(m) ? [m] : [],
+          banco: esMayor(m) ? [] : [m],
+          fecha: m.fecha,
+          importe: Math.abs(Number(m.importe)),
+        });
+      }
+      for (const [fecha, lista] of anterioresPorDia) {
+        bloques.push({ tipo: "anterior", mayor: [], banco: lista.sort(porFechaOrden), fecha,
+                       importe: Math.abs(suma(lista)), clave: `a-${fecha}` });
+      }
+      for (const [fecha, lista] of gastosPorDia) {
+        bloques.push({ tipo: "gastos", mayor: [], banco: lista.sort(porFechaOrden), fecha,
+                       importe: Math.abs(suma(lista)), clave: `g-${fecha}` });
+      }
+
+      bloques.sort((a, b) => a.fecha.localeCompare(b.fecha) || a.importe - b.importe);
+    }
+
+    // ---------- Resumen y control de saldos
+
+    function pintarResumen() {
+      const c = datos.cuadre;
+      const tarjeta = (titulo, valor, detalle, clase = "") =>
+        `<div class="conc-tarjeta ${clase}"><span>${titulo}</span><strong>${valor}</strong>` +
+        (detalle ? `<small>${detalle}</small>` : "") + "</div>";
+      document.getElementById("resumen").innerHTML =
+        tarjeta("Asientos del mayor conciliados", `${c.conciliados} de ${c.asientos_mayor}`, "",
+                c.pend_mayor ? "" : "conc-tarjeta-ok") +
+        tarjeta("En mayor, no en banco", c.pend_mayor, `$ ${importe(c.tot_pend_mayor)}`,
+                c.pend_mayor ? "conc-tarjeta-pend" : "conc-tarjeta-ok") +
+        tarjeta("En banco, no en mayor", c.pend_banco, `$ ${importe(c.tot_pend_banco)}`,
+                c.pend_banco ? "conc-tarjeta-pend" : "conc-tarjeta-ok") +
+        tarjeta("Propuestas sin revisar", c.propuestas, "no cuentan como conciliadas", c.propuestas ? "conc-tarjeta-conf" : "") +
+        tarjeta("Gastos del banco sin asiento", c.pend_gastos, `$ ${importe(c.tot_gastos)}`) +
+        (c.con_arrastre ? tarjeta("Pendientes del mes anterior sin cruzar", c.pend_arrastrados,
+          "incluidos en los de arriba", c.pend_arrastrados ? "conc-tarjeta-pend" : "conc-tarjeta-ok") : "");
+
+      const linea = (texto, valor, clase = "") =>
+        `<tr class="${clase}"><td>${texto}</td><td class="num">${importe(valor)}</td></tr>`;
+      const marca = (v) => (Math.abs(v) < 0.005 ? "conc-saldo-ok" : "conc-saldo-mal");
+      document.getElementById("tablaSaldos").innerHTML =
+        `<tr class="conc-saldo-titulo"><td colspan="2">Al inicio</td></tr>` +
+        linea("Saldo inicial según banco", c.ini_banco) +
+        linea("Saldo inicial según mayor", c.ini_mayor) +
+        linea("Diferencia al inicio", c.dif_ini) +
+        linea(c.con_arrastre
+          ? "Explicada por los pendientes que quedaron al cerrar el mes anterior"
+          : "Explicada por asientos que el banco registró el mes anterior", c.tot_mes_ant) +
+        linea("Diferencia inicial sin explicar", c.sin_explicar_ini, `conc-saldo-total ${marca(c.sin_explicar_ini)}`) +
+        `<tr class="conc-saldo-titulo"><td colspan="2">Al cierre</td></tr>` +
+        linea("Saldo final según mayor", c.fin_mayor) +
+        linea("(+/−) Movimientos del banco sin contabilizar", c.tot_pend_banco) +
+        linea("(+/−) Gastos e impuestos del banco sin contabilizar", c.tot_gastos) +
+        linea("(−/+) Asientos del mayor que no están en el banco", -c.tot_pend_mayor) +
+        linea("(−/+) Diferencias de importe en partidas conciliadas", -c.difs) +
+        linea("Saldo del banco calculado", c.calculado, "conc-saldo-total") +
+        linea("Saldo final según banco", c.fin_banco, "conc-saldo-total") +
+        linea("Diferencia final (debe coincidir con la inicial sin explicar)", c.dif_final,
+              `conc-saldo-total ${marca(c.dif_final - c.sin_explicar_ini)}`);
+    }
+
+    // ---------- Punteo
+
+    function pasaFiltro(b) {
+      const filtro = document.querySelector("input[name=filtro]:checked").value;
+      const verGastos = document.getElementById("verGastos").checked;
+      if (b.tipo === "gastos" && !verGastos) return false;
+      if (b.tipo === "anterior" && filtro !== "todo") return false;
+      if (filtro === "no-cierra" && b.tipo !== "pendiente" && b.tipo !== "confirmar") return false;
+      if (filtro === "confirmar" && b.tipo !== "confirmar") return false;
+      if (filtro === "sin-revisar" && !(b.tipo === "pendiente" && [...b.mayor, ...b.banco].some((m) => !m.revisado))) return false;
+      if (filtro === "no-socios" && !b.banco.some((m) => Number(m.importe) > 0 && estadoSocio(m) === "no")) return false;
+
+      const texto = document.getElementById("buscar").value.trim().toLowerCase();
+      if (!texto) return true;
+      // "55817,61", "55.817,61" o "55817.61" encuentran el mismo importe.
+      const comoNumero = texto.replace(/\./g, "").replace(",", ".");
+      return [...b.mayor, ...b.banco].some((m) =>
+        `${m.concepto} ${m.detalle || ""} ${m.nro || ""}`.toLowerCase().includes(texto) ||
+        (/^-?\d+(\.\d+)?$/.test(comoNumero) && Math.abs(Number(m.importe)).toFixed(2).startsWith(comoNumero)));
+    }
+
+    // ---------- Socios (CUIT del detalle del banco contra UNION.SOMAESGRAL)
+
+    // "si" | "no" | null (sin CUIT, CUIT propio, gasto, o base de socios no disponible)
+    function estadoSocio(m) {
+      if (esMayor(m) || !m.cuit || m.cuit === datos.cuitPropio || m.rubro_gasto || !datos.socios) return null;
+      return datos.socios[m.cuit] ? "si" : "no";
+    }
+
+    // ---------- Renglones
+
+    // Los movimientos pendientes se pueden tildar para conciliarlos a mano.
+    function atributosTilde(m, tildable) {
+      if (!tildable) return "";
+      return ` data-mov="${m.id}" class="conc-tildable${tildados.has(m.id) ? " conc-tildado" : ""}"`;
+    }
+    function casilla(m, tildable) {
+      return tildable ? `<input type="checkbox" tabindex="-1" ${tildados.has(m.id) ? "checked" : ""} /> ` : "";
+    }
+
+    // Marcas de observaciones / revisado y botón para abrir el panel del movimiento.
+    function indicadores(m) {
+      if (m.lado === "A") return "";
+      return (m.obs ? ` <span class="conc-ind" title="Tiene observaciones">💬${m.obs}</span>` : "") +
+        (m.revisado ? ` <span class="conc-ind conc-ind-rev" title="Revisado">✔ rev.</span>` : "") +
+        ` <button type="button" class="conc-ver" data-detalle="${m.id}" title="Ver detalle, notas y sugerencias">🔎</button>`;
+    }
+
+    function celdasMayor(m, tildable) {
+      if (!m) return `<td></td><td></td><td></td><td></td><td></td>`;
+      const v = Number(m.importe);
+      const a = atributosTilde(m, tildable);
+      return `<td${a}><span class="conc-fecha">${casilla(m, tildable)}${fechaCorta(m.fecha).slice(0, 5)}</span></td>
+        <td${a}><div class="conc-concepto">${etiquetaArrastre(m)}${esc(m.concepto)}${indicadores(m)}</div></td>
+        <td${a}>${esc(m.nro || "")}</td>
+        <td${a}><div class="num">${v > 0 ? importe(v) : ""}</div></td>
+        <td${a}><div class="num">${v < 0 ? importe(-v) : ""}</div></td>`;
+    }
+
+    function celdasBanco(m, tildable) {
+      if (!m) return `<td></td><td></td><td></td><td></td>`;
+      const v = Number(m.importe);
+      const a = atributosTilde(m, tildable);
+      const anterior = m.lado === "A" ? `<span class="conc-etiqueta">resumen anterior</span> ` : etiquetaArrastre(m);
+      const detalle = m.detalle ? `<small title="${esc(m.detalle)}">${esc(m.detalle)}</small>` : "";
+      return `<td${a}><span class="conc-fecha">${casilla(m, tildable)}${fechaCorta(m.fecha).slice(0, 5)}</span></td>
+        <td${a}><div class="conc-concepto">${anterior}${esc(m.concepto)} ${etiquetaSocio(m, datos)}${indicadores(m)}${detalle}</div></td>
+        <td${a}><div class="num">${v > 0 ? importe(v) : ""}</div></td>
+        <td${a}><div class="num">${v < 0 ? importe(-v) : ""}</div></td>`;
+    }
+
+    function bloqueHtml(b) {
+      const tildable = ["pendiente", "gastos", "anterior"].includes(b.tipo) && datos.periodo.estado === "abierto";
+      const clave = b.cruce ? `c-${b.cruce.id}` : b.clave;
+      const grande = clave && Math.max(b.mayor.length, b.banco.length) > MOSTRAR_POR_LADO + 1;
+      const abierto = !grande || desplegados.has(clave);
+      const mayor = abierto ? b.mayor : b.mayor.slice(0, MOSTRAR_POR_LADO);
+      const banco = abierto ? b.banco : b.banco.slice(0, MOSTRAR_POR_LADO);
+      const filas = Math.max(mayor.length, banco.length, 1);
+      const marca = { ok: "✓", confirmar: "?" }[b.tipo] || "";
+      const titulo = b.cruce ? `${b.cruce.regla}${b.cruce.nota ? " — " + b.cruce.nota : ""}` : "";
+
+      let html = "";
+      for (let i = 0; i < filas; i++) {
+        const accionMarca = b.cruce && datos.periodo.estado === "abierto"
+          ? ` data-cruce="${b.cruce.id}" role="button"` : "";
+        html += `<tr class="conc-b conc-b-${b.tipo}${i === 0 ? " conc-b-inicio" : ""}">` +
+          celdasMayor(mayor[i], tildable) +
+          (i === 0 ? `<td class="conc-marca${accionMarca ? " conc-marca-accion" : ""}" rowspan="${filas}"
+                         title="${esc(titulo)}"${accionMarca}>${marca}</td>` : "") +
+          celdasBanco(banco[i], tildable) + "</tr>";
+      }
+
+      const notas = [];
+      if (b.tipo === "anterior") {
+        notas.push(`${b.banco.length} movimientos del resumen del mes anterior que no se cruzaron: ` +
+          "si un asiento de los primeros días del mes corresponde a alguno, tildalos juntos y conciliá");
+      }
+      if (b.tipo === "gastos") {
+        notas.push(`${b.banco.length} gastos e impuestos del banco sin asiento en el mayor`);
+        if (tildable) {
+          notas.push(`<button type="button" class="conc-desplegar" data-tildar-todos="${b.clave}">` +
+            `Tildar todos los gastos del día ($ ${importe(b.importe)})</button>`);
+        }
+      }
+      if (b.cruce && (b.cruce.nota || b.tipo === "confirmar" || b.cruce.origen === "manual"
+                      || b.mayor.length > 1 || b.banco.length > 1)) {
+        const quien = b.cruce.origen === "manual" && b.cruce.creado_por_nombre
+          ? ` (${esc(b.cruce.creado_por_nombre)})` : "";
+        const aceptado = b.cruce.resuelto_por_nombre ? ` · aceptado por ${esc(b.cruce.resuelto_por_nombre)}` : "";
+        notas.push(esc(b.cruce.regla) + quien + (b.cruce.nota ? `: ${esc(b.cruce.nota)}` : "") + aceptado);
+      }
+      if (grande) {
+        const ocultos = b.mayor.length - mayor.length + b.banco.length - banco.length;
+        notas.push(`<button type="button" class="conc-desplegar" data-clave="${clave}">` +
+          (abierto ? "Ocultar detalle" : `Ver ${ocultos} renglones más`) + "</button>");
+      }
+      if (notas.length) {
+        html += `<tr class="conc-b conc-b-${b.tipo} conc-b-nota"><td colspan="10">${notas.join(" · ")}</td></tr>`;
+      }
+      return html;
+    }
+
+    function pintarPunteo() {
+      let html = "";
+      let diaActual = null;
+      let visibles = 0;
+      for (const b of bloques) {
+        if (!pasaFiltro(b)) continue;
+        visibles++;
+        if (b.fecha !== diaActual) {
+          diaActual = b.fecha;
+          const d = new Date(b.fecha + "T12:00:00");
+          html += `<tr class="conc-dia"><td colspan="10">${DIAS[d.getDay()]} ${fechaCorta(b.fecha)}</td></tr>`;
+        }
+        html += bloqueHtml(b);
+      }
+      document.querySelector("#punteo tbody").innerHTML = html ||
+        `<tr><td colspan="10" class="conc-vacio">No hay nada para mostrar con este filtro.</td></tr>`;
+    }
+
+    document.querySelector("#punteo tbody").addEventListener("click", (e) => {
+      const ver = e.target.closest("[data-detalle]");
+      if (ver) return abrirPanel(Number(ver.dataset.detalle));
+
+      const todos = e.target.closest("[data-tildar-todos]");
+      if (todos) {
+        const bloque = bloques.find((b) => b.clave === todos.dataset.tildarTodos);
+        const yaEstan = bloque.banco.every((m) => tildados.has(m.id));
+        bloque.banco.forEach((m) => (yaEstan ? tildados.delete(m.id) : tildados.add(m.id)));
+        pintarPunteo();
+        actualizarBarra();
+        return;
+      }
+
+      const boton = e.target.closest(".conc-desplegar");
+      if (boton) {
+        const clave = boton.dataset.clave;
+        desplegados.has(clave) ? desplegados.delete(clave) : desplegados.add(clave);
+        pintarPunteo();
+        return;
+      }
+
+      const marca = e.target.closest("[data-cruce]");
+      if (marca) return accionesCruce(Number(marca.dataset.cruce));
+
+      // Tildar/destildar: clic en cualquier parte del renglón de ese lado.
+      const celda = e.target.closest("[data-mov]");
+      if (celda) {
+        const id = Number(celda.dataset.mov);
+        tildados.has(id) ? tildados.delete(id) : tildados.add(id);
+        const marcado = tildados.has(id);
+        document.querySelectorAll(`[data-mov="${id}"]`).forEach((td) => {
+          td.classList.toggle("conc-tildado", marcado);
+          const caja = td.querySelector("input[type=checkbox]");
+          if (caja) caja.checked = marcado;
+        });
+        actualizarBarra();
+      }
+    });
+
+    // ---------- Barra de lo tildado y conciliación a mano
+
+    function sumasTildadas() {
+      const movs = [...tildados].map((id) => movPorId.get(id)).filter(Boolean);
+      const mayor = movs.filter(esMayor);
+      const banco = movs.filter((m) => !esMayor(m));
+      const centavos = (lista) => lista.reduce((s, m) => s + Math.round(Number(m.importe) * 100), 0);
+      return { mayor, banco, sumaMayor: centavos(mayor) / 100, sumaBanco: centavos(banco) / 100,
+               dif: (centavos(mayor) - centavos(banco)) / 100 };
+    }
+
+    function actualizarBarra() {
+      // Si algo tildado dejó de estar pendiente (lo concilió otro), se suelta.
+      const pendientes = new Set(bloques.filter((b) => ["pendiente", "gastos", "anterior"].includes(b.tipo))
+        .flatMap((b) => [...b.mayor, ...b.banco]).map((m) => m.id));
+      for (const id of [...tildados]) if (!pendientes.has(id)) tildados.delete(id);
+      const barra = document.getElementById("barraSeleccion");
+      barra.hidden = tildados.size === 0;
+      if (barra.hidden) return;
+      const s = sumasTildadas();
+      document.getElementById("selMayor").textContent = `${s.mayor.length} · $ ${importe(s.sumaMayor)}`;
+      document.getElementById("selBanco").textContent = `${s.banco.length} · $ ${importe(s.sumaBanco)}`;
+      const dif = document.getElementById("selDif");
+      const unSoloLado = !s.mayor.length || !s.banco.length;
+      const valorDif = unSoloLado ? s.sumaMayor + s.sumaBanco : s.dif;
+      dif.textContent = `$ ${importe(valorDif)}`;
+      dif.className = Math.abs(valorDif) < 0.005 ? "conc-dif-ok" : "conc-dif-mal";
+      document.getElementById("btnSugerencias").hidden = tildados.size !== 1;
+    }
+
+    document.getElementById("btnSugerencias").addEventListener("click", () => abrirPanel([...tildados][0]));
+
+    // ---------- Panel del movimiento: sugerencias, revisado y observaciones
+
+    const panel = document.getElementById("panel");
+    const panelContenido = document.getElementById("panelContenido");
+    let panelMovimientoId = null;
+    document.getElementById("btnCerrarPanel").addEventListener("click", () => {
+      panel.hidden = true;
+      panelMovimientoId = null;
+    });
+
+    const nombreLado = (lado) => ({ M: "Mayor", R: "Mayor (pendiente del mes anterior)", A: "Banco (resumen anterior)",
+                                    Q: "Banco (pendiente del mes anterior)" })[lado] || "Banco";
+    const lineaMovimiento = (m) =>
+      `<div class="conc-panel-mov"><span>${nombreLado(m.lado)} · ${fechaCorta(m.fecha)}</span>
+         <span>${esc(m.concepto)}</span><strong>$ ${importe(m.importe)}</strong></div>`;
+
+    async function abrirPanel(movimientoId) {
+      panelMovimientoId = movimientoId;
+      panel.hidden = false;
+      panelContenido.innerHTML = `<p class="conc-cargando">Cargando…</p>`;
+      let d;
+      try {
+        d = await pedirJson(`/api/conciliacion/movimientos/${movimientoId}`);
+      } catch (error) {
+        panelContenido.innerHTML = `<p class="conc-aviso conc-aviso-error">${esc(error.message)}</p>`;
+        return;
+      }
+      if (panelMovimientoId !== movimientoId) return; // se abrió otro mientras cargaba
+      const m = d.movimiento;
+      const local = movPorId.get(m.id);
+
+      const sugerencias = !d.pendiente ? `<p class="conc-panel-nota">Este movimiento ya está conciliado.</p>`
+        : !d.sugerencias.some((s) => s.movimientos.length)
+          ? `<p class="conc-panel-nota">No se encontraron candidatos: mismo importe, importe parecido, suma de varios o mismo importe en otro banco.</p>` +
+            d.sugerencias.map((s) => `<div class="conc-sugerencia"><div>${esc(s.texto)}</div></div>`).join("")
+        : d.sugerencias.map((s, i) => `
+            <div class="conc-sugerencia">
+              <div class="conc-sugerencia-titulo">${esc(s.texto)}</div>
+              ${s.movimientos.map(lineaMovimiento).join("")}
+              ${s.tipo === "otro_banco"
+                ? `<a href="/conciliacion-punteo.html?id=${s.periodoId}" target="_blank">Abrir ese punteo ▸</a>`
+                : d.abierto && s.movimientos.length ? `<button type="button" data-sugerencia="${i}">Tildar para conciliar</button>` : ""}
+            </div>`).join("");
+
+      const revisado = d.revisado
+        ? `revisado por ${esc(d.revisado.usuario)} el ${new Date(d.revisado.fecha).toLocaleString("es-AR")}` : "";
+      const observaciones = d.observaciones.length
+        ? d.observaciones.map((o) => `<div class="conc-obs"><p>${esc(o.texto)}</p>
+            <small>${esc(o.usuario)} · ${new Date(o.fecha).toLocaleString("es-AR")}</small></div>`).join("")
+        : `<p class="conc-panel-nota">Sin observaciones.</p>`;
+
+      panelContenido.innerHTML = `
+        <h3>${nombreLado(m.lado)} · ${fechaCorta(m.fecha)}</h3>
+        <p class="conc-panel-concepto">${esc(m.concepto)} ${local ? etiquetaSocio(local, datos) : ""}</p>
+        ${m.detalle ? `<p class="conc-panel-nota">${esc(m.detalle)}</p>` : ""}
+        <p class="conc-panel-importe">$ ${importe(m.importe)}${m.nro ? ` <small>asiento ${esc(m.nro)}</small>` : ""}</p>
+
+        <label class="conc-panel-revisado">
+          <input type="checkbox" id="chkRevisado" ${d.revisado ? "checked" : ""} ${d.abierto ? "" : "disabled"} />
+          Revisado <small>${revisado}</small>
+        </label>
+
+        ${d.pendiente ? "<h4>Posibles contrapartidas</h4>" : ""}
+        ${sugerencias}
+
+        <h4>Observaciones</h4>
+        ${observaciones}
+        ${d.abierto ? `<textarea id="txtObservacion" rows="3" maxlength="1000"
+                        placeholder="Ej.: se pidió al banco el comprobante"></textarea>
+                       <button type="button" id="btnObservacion">Agregar observación</button>` : ""}`;
+
+      panelContenido.querySelectorAll("[data-sugerencia]").forEach((boton) => {
+        boton.addEventListener("click", () => {
+          const s = d.sugerencias[Number(boton.dataset.sugerencia)];
+          tildados.add(m.id);
+          s.movimientos.forEach((x) => tildados.add(x.id));
+          pintarPunteo();
+          actualizarBarra();
+          document.querySelector(`[data-mov="${s.movimientos[0].id}"]`)?.scrollIntoView({ block: "center" });
+        });
+      });
+
+      document.getElementById("chkRevisado").addEventListener("change", async (e) => {
+        try {
+          await pedirJson(`/api/conciliacion/movimientos/${m.id}/revisado`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ revisado: e.target.checked }),
+          });
+          if (local) local.revisado = e.target.checked ? 1 : 0;
+          pintarPunteo();
+        } catch (error) {
+          e.target.checked = !e.target.checked;
+          await preguntar(error.message, [{ valor: true, texto: "Entendido" }]);
+        }
+        abrirPanel(m.id);
+      });
+
+      document.getElementById("btnObservacion")?.addEventListener("click", async () => {
+        const texto = document.getElementById("txtObservacion").value.trim();
+        if (!texto) return;
+        try {
+          await pedirJson(`/api/conciliacion/movimientos/${m.id}/observaciones`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ texto }),
+          });
+          if (local) local.obs = (local.obs || 0) + 1;
+          pintarPunteo();
+        } catch (error) {
+          await preguntar(error.message, [{ valor: true, texto: "Entendido" }]);
+        }
+        abrirPanel(m.id);
+      });
+    }
+
+    // ---------- Cierre y reapertura del mes
+
+    document.getElementById("btnCerrarMes").addEventListener("click", async () => {
+      const c = datos.cuadre;
+      const p = datos.periodo;
+      const cierra = Math.abs(c.dif_final - c.sin_explicar_ini) < 0.005;
+      const ok = await preguntar(
+        `¿Cerrar ${p.bancoNombre} de ${NOMBRES_MES[p.mes - 1]} ${p.anio}? Quedan ${c.pend_mayor} asientos del mayor ` +
+        `y ${c.pend_banco} movimientos del banco pendientes (más ${c.pend_gastos} gastos): pasan al mes siguiente ` +
+        "para cruzarlos ahí. " + (cierra ? "El control de saldos cierra." :
+          `ATENCIÓN: el control de saldos no cierra (diferencia final $ ${importe(c.dif_final)}).`) +
+        " Una vez cerrado, el mes queda sólo para consulta.", [
+          { valor: true, texto: "🔒 Cerrar el mes" },
+          { valor: false, texto: "Cancelar", secundario: true },
+        ]);
+      if (!ok) return;
+      try {
+        await pedirJson(`/api/conciliacion/periodos/${periodoId}/cerrar`, { method: "POST" });
+        location.reload();
+      } catch (error) {
+        await preguntar(error.message, [{ valor: true, texto: "Entendido" }]);
+      }
+    });
+
+    document.getElementById("btnReabrirMes").addEventListener("click", async () => {
+      const ok = await preguntar("¿Reabrir este mes? Sus pendientes se retiran del mes siguiente; lo que se " +
+        "haya conciliado a mano allá con esos pendientes se deshace.", [
+        { valor: true, texto: "Reabrir" },
+        { valor: false, texto: "Cancelar", secundario: true },
+      ]);
+      if (!ok) return;
+      try {
+        await pedirJson(`/api/conciliacion/periodos/${periodoId}/reabrir`, { method: "POST" });
+        location.reload();
+      } catch (error) {
+        await preguntar(error.message, [{ valor: true, texto: "Entendido" }]);
+      }
+    });
+
+    document.getElementById("btnLimpiar").addEventListener("click", () => {
+      tildados.clear();
+      pintarPunteo();
+      actualizarBarra();
+    });
+
+    document.getElementById("btnConciliar").addEventListener("click", async () => {
+      const s = sumasTildadas();
+      const unSoloLado = !s.mayor.length || !s.banco.length;
+      if (unSoloLado && Math.abs(s.sumaMayor + s.sumaBanco) >= 0.005) {
+        await preguntar("Tildaste movimientos de un solo lado y no se anulan entre sí (no suman cero). " +
+          "Tildá también lo que corresponde del otro lado.", [{ valor: true, texto: "Entendido" }]);
+        return;
+      }
+      if (!unSoloLado && Math.abs(s.dif) >= 0.005) {
+        const ok = await preguntar(`Entre el mayor y el banco hay una diferencia de $ ${importe(s.dif)}. ` +
+          "¿Conciliar igual? La diferencia queda registrada y aparece en el control de saldos.", [
+          { valor: true, texto: "Conciliar con diferencia" },
+          { valor: false, texto: "Cancelar", secundario: true },
+        ]);
+        if (!ok) return;
+      }
+      try {
+        await pedirJson(`/api/conciliacion/periodos/${periodoId}/cruces`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ movimientos: [...tildados] }),
+        });
+        tildados.clear();
+      } catch (error) {
+        await preguntar(error.message, [{ valor: true, texto: "Entendido" }]);
+      }
+      cargar();
+    });
+
+    // Aceptar / rechazar un cruce "para confirmar", o deshacer uno conciliado.
+    async function accionesCruce(cruceId) {
+      const c = datos.cruces.find((x) => x.id === cruceId);
+      if (!c) return;
+      const items = c.items.map((id) => movPorId.get(id));
+      const suma = (lado) => items.filter((m) => (lado === "M") === esMayor(m))
+        .reduce((s, m) => s + Number(m.importe), 0);
+      const texto = `Cruce n° ${c.numero} — ${c.regla}${c.nota ? `: ${c.nota}` : ""}. ` +
+        `Mayor $ ${importe(suma("M"))}, banco $ ${importe(suma("B"))}.`;
+      const opciones = c.estado === "a_confirmar"
+        ? [{ valor: "aceptar", texto: "✓ Aceptar" }, { valor: "rechazar", texto: "✗ Rechazar" }]
+        : [{ valor: "deshacer", texto: "Deshacer (vuelven a quedar pendientes)" }];
+      const accion = await preguntar(texto, [...opciones, { valor: null, texto: "Cancelar", secundario: true }]);
+      if (!accion) return;
+      try {
+        await pedirJson(`/api/conciliacion/cruces/${cruceId}/${accion}`, { method: "POST" });
+      } catch (error) {
+        await preguntar(error.message, [{ valor: true, texto: "Entendido" }]);
+      }
+      cargar();
+    }
+    document.querySelectorAll("input[name=filtro], #verGastos").forEach((x) => x.addEventListener("change", pintarPunteo));
+    let relojBuscar;
+    document.getElementById("buscar").addEventListener("input", () => {
+      clearTimeout(relojBuscar);
+      relojBuscar = setTimeout(pintarPunteo, 250);
+    });
+
+    function mostrarAviso(tipo, texto) {
+      const div = document.createElement("div");
+      div.className = `conc-aviso conc-aviso-${tipo}`;
+      div.textContent = texto;
+      document.getElementById("avisos").appendChild(div);
+    }
+
+    cargar();
+  </script>
+</body>
+</html>

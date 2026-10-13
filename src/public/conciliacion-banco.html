@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Conciliación — Información Mutual</title>
+  <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
+  <script>
+    (function () {
+      var t = localStorage.getItem("tema");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-izq">
+      <img src="/img/logo-blanco.png" alt="Logo Mutual" class="logo-barra" />
+      <h1 id="titulo">Conciliación</h1>
+      <span class="saludo" id="saludo"></span>
+    </div>
+  </header>
+
+  <main class="cb-main">
+    <a class="cb-volver" id="linkVolver" href="/conciliacion.html">◂ Todos los bancos</a>
+
+    <nav class="cb-pasos">
+      <button type="button" data-paso="1">1 · Papeles</button>
+      <button type="button" data-paso="2">2 · Conciliar</button>
+      <button type="button" data-paso="3">3 · Cerrar el mes</button>
+    </nav>
+
+    <div id="avisos" class="conc-avisos"></div>
+
+    <!-- Paso 1: el mayor y el resumen del banco -->
+    <section id="paso1" class="cb-paso" hidden>
+      <div class="cb-papeles">
+        <div class="cb-papel" id="papelMayor"></div>
+        <div class="cb-papel" id="papelBanco"></div>
+      </div>
+      <div class="cb-leer" id="zonaLeer"></div>
+    </section>
+
+    <!-- Paso 2: conciliar -->
+    <section id="paso2" class="cb-paso" hidden>
+      <div class="cb-contadores" id="contadores"></div>
+      <div class="cb-secciones" id="secciones"></div>
+      <div class="cb-buscar">
+        <input type="search" id="buscar" placeholder="Buscar por importe o texto (ej. 55817,61 o ROJAS)…" />
+      </div>
+      <div id="contenidoSeccion"></div>
+    </section>
+
+    <!-- Paso 3: cerrar el mes -->
+    <section id="paso3" class="cb-paso" hidden>
+      <div id="cierre"></div>
+    </section>
+  </main>
+
+  <!-- Detalle de un renglón: posibles pares, mes siguiente, notas -->
+  <aside class="conc-panel" id="panel" hidden>
+    <button type="button" class="conc-panel-cerrar" id="btnCerrarPanel" title="Cerrar">✕</button>
+    <div id="panelContenido"></div>
+  </aside>
+
+  <!-- Lo elegido para conciliar a mano -->
+  <div class="conc-seleccion" id="barraSeleccion" hidden>
+    <div><span>Mayor</span><strong id="selMayor"></strong></div>
+    <div><span>Banco</span><strong id="selBanco"></strong></div>
+    <div><span>Diferencia</span><strong id="selDif"></strong></div>
+    <button type="button" id="btnConciliarElegidos">✓ Conciliar</button>
+    <button type="button" id="btnLimpiar" class="secundario">Destildar</button>
+  </div>
+
+  <div class="conc-modal" id="modal" hidden>
+    <div class="conc-modal-caja">
+      <p id="modalTexto"></p>
+      <div class="conc-modal-botones" id="modalBotones"></div>
+    </div>
+  </div>
+  <input type="file" id="selectorArchivo" accept="application/pdf,.pdf" hidden />
+
+  <footer class="barra-inferior">
+    <a href="/conciliacion.html" class="btn-inferior principal" id="linkVolverPie">◂ Todos los bancos</a>
+    <button id="btnSalir" class="btn-inferior peligro">Cerrar sesión</button>
+  </footer>
+
+  <script src="/comun.js"></script>
+  <script src="/conciliacion-comun.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    const BANCO = (params.get("banco") || "").toUpperCase();
+    const ANIO = Number(params.get("anio"));
+    const MES = Number(params.get("mes"));
+    const POR_PAGINA = 150;
+
+    let cab = null;        // el banco en el mes: papeles y estado (GET /mes)
+    let datos = null;      // movimientos y cruces (GET /periodos/:id)
+    let paso = Number(params.get("paso")) || null;
+    let seccion = "propuestas";
+    let filtroPropuestas = "todas";
+    let mostrar = POR_PAGINA;
+    const elegidos = new Set();
+    let reloj = null;
+
+    // Índices armados a partir de "datos"
+    let porId = new Map();
+    let estadoDe = new Map();   // id movimiento -> conciliado | mes_siguiente | propuesto | sin_par
+    let cruceDe = new Map();    // id movimiento -> cruce vigente (no rechazado)
+
+    const volver = `/conciliacion.html?anio=${ANIO}&mes=${MES}`;
+    document.getElementById("linkVolver").href = volver;
+    document.getElementById("linkVolverPie").href = volver;
+
+    // ================================================================ Carga
+
+    async function cargar() {
+      clearTimeout(reloj);
+      try {
+        cab = await pedirJson(`/api/conciliacion/mes?banco=${BANCO}&anio=${ANIO}&mes=${MES}`);
+        const p = cab.periodo;
+        datos = p && (p.estado === "abierto" || p.estado === "cerrado")
+          ? await pedirJson(`/api/conciliacion/periodos/${p.id}`) : null;
+      } catch (error) {
+        aviso("error", error.message);
+        return;
+      }
+      document.title = `${cab.nombre} ${NOMBRES_MES[MES - 1]} ${ANIO} — Conciliación`;
+      document.getElementById("titulo").textContent = `${cab.nombre} · ${NOMBRES_MES[MES - 1]} ${ANIO}`;
+      armarIndices();
+      if (!paso) paso = !datos ? 1 : datos.periodo.estado === "cerrado" ? 3 : 2;
+      pintar();
+      if (cab.periodo?.estado === "procesando") reloj = setTimeout(cargar, 3000);
+    }
+
+    function armarIndices() {
+      porId = new Map();
+      estadoDe = new Map();
+      cruceDe = new Map();
+      if (!datos) return;
+      for (const m of datos.movimientos) porId.set(m.id, m);
+      const prioridad = { conciliado: 3, mes_siguiente: 2, a_confirmar: 1 };
+      for (const c of datos.cruces) {
+        if (!prioridad[c.estado]) continue;
+        for (const id of c.items) {
+          const actual = cruceDe.get(id);
+          if (!actual || prioridad[c.estado] > prioridad[actual.estado]) cruceDe.set(id, c);
+        }
+      }
+      for (const m of datos.movimientos) {
+        const c = cruceDe.get(m.id);
+        estadoDe.set(m.id, !c ? "sin_par" : c.estado === "a_confirmar" ? "propuesto" : c.estado);
+      }
+      for (const id of [...elegidos]) {
+        if (!porId.has(id) || estadoDe.get(id) === "conciliado") elegidos.delete(id);
+      }
+    }
+
+    function pintar() {
+      document.querySelectorAll(".cb-pasos button").forEach((b) => {
+        b.classList.toggle("activo", Number(b.dataset.paso) === paso);
+        b.disabled = Number(b.dataset.paso) > 1 && !datos;
+      });
+      for (const n of [1, 2, 3]) document.getElementById(`paso${n}`).hidden = n !== paso;
+      document.getElementById("avisos").innerHTML = "";
+      // Lo más importante primero: si falta usar algún papel (por ejemplo el
+      // resumen del mes anterior, cargado después de leer), se avisa en todos
+      // los pasos, con el botón para volver a leer ahí mismo.
+      if (cab.periodo?.avisoLectura && cab.periodo.estado === "abierto") {
+        const div = aviso("alerta", cab.periodo.avisoLectura);
+        if (cab.mayor && cab.resumen.length) {
+          const boton = document.createElement("button");
+          boton.type = "button";
+          boton.className = "conc-boton";
+          boton.textContent = "Volver a leer ahora";
+          boton.addEventListener("click", leer);
+          div.appendChild(boton);
+        }
+      }
+      if (datos?.avisoAnterior) aviso("info", datos.avisoAnterior);
+      if (datos?.periodo.estado === "cerrado" && paso !== 1) {
+        aviso("info", `Mes cerrado${datos.periodo.cerradoPor ? ` por ${datos.periodo.cerradoPor}` : ""}: sólo se puede consultar.`);
+      }
+      if (paso === 1) pintarPapeles();
+      if (paso === 2) pintarConciliar();
+      if (paso === 3) pintarCierre();
+      actualizarBarra();
+    }
+
+    document.querySelector(".cb-pasos").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-paso]");
+      if (!b || b.disabled) return;
+      paso = Number(b.dataset.paso);
+      pintar();
+    });
+
+    function aviso(tipo, texto) {
+      const div = document.createElement("div");
+      div.className = `conc-aviso conc-aviso-${tipo}`;
+      const span = document.createElement("span");
+      span.textContent = texto;
+      div.appendChild(span);
+      document.getElementById("avisos").appendChild(div);
+      return div;
+    }
+
+    const abierto = () => datos?.periodo.estado === "abierto";
+    const pesos = (v) => `$ ${importe(v)}`;
+    const urlPdf = (tipo, n = 0) => `/api/conciliacion/pdf?banco=${BANCO}&anio=${ANIO}&mes=${MES}&tipo=${tipo}&n=${n}`;
+
+    // ============================================================ Paso 1
+
+    function pintarPapeles() {
+      const lectura = datos?.lectura;
+      const p = cab.periodo;
+      const editable = p?.estado !== "cerrado";
+
+      // Mayor
+      const pm = document.getElementById("papelMayor");
+      if (cab.bloqueado) {
+        pm.innerHTML = `<h3>Mayor de la mutual</h3><p class="cb-gris">Este mes no se concilia: sólo se usa el resumen del banco
+          (para los movimientos de los primeros días del mes siguiente).</p>`;
+      } else if (cab.mayor) {
+        const l = lectura?.mayor;
+        const pie = l && l.total_debe_pie !== null
+          && Math.abs(l.debe - l.total_debe_pie) < 0.005 && Math.abs(l.haber - l.total_haber_pie) < 0.005;
+        pm.innerHTML = `<h3>Mayor de la mutual</h3>
+          <p class="cb-archivo">✓ ${esc(cab.mayor)}</p>
+          ${l ? `<ul class="cb-lectura">
+              <li><strong>${l.renglones}</strong> asientos leídos</li>
+              <li>Debe ${pesos(l.debe)} · Haber ${pesos(l.haber)} ${pie ? '<span class="cb-ok">coinciden con el total del listado ✓</span>' : ""}</li>
+              <li>Saldo inicial ${pesos(l.saldo_inicial)} → final ${pesos(l.saldo_final)}</li>
+            </ul>` : `<p class="cb-gris">Todavía no se leyó.</p>`}
+          <div class="cb-botones">
+            <a class="conc-boton secundario" href="${urlPdf("mayor")}" target="_blank">Ver PDF</a>
+            ${editable ? `<button type="button" class="conc-boton secundario" data-subir="mayor">Reemplazar</button>` : ""}
+          </div>`;
+      } else {
+        pm.innerHTML = `<h3>Mayor de la mutual</h3>${zonaSoltar("mayor", "Arrastrá acá el PDF del mayor de este banco")}`;
+      }
+
+      // Resumen del banco
+      const pb = document.getElementById("papelBanco");
+      const lb = lectura?.banco;
+      pb.innerHTML = `<h3>Resumen del banco</h3>
+        ${cab.resumen.length ? cab.resumen.map((n, i) =>
+          `<p class="cb-archivo">✓ ${esc(n)} <a href="${urlPdf("resumen", i)}" target="_blank">ver</a></p>`).join("") : ""}
+        ${lb ? `<ul class="cb-lectura">
+            <li><strong>${lb.renglones}</strong> movimientos de ${NOMBRES_MES[MES - 1].toLowerCase()}</li>
+            ${lb.archivos.map((a) => `<li class="cb-gris">${esc(a.archivo)}: ${a.renglones} movimientos
+              (${fechaCorta(a.desde).slice(0, 5)}${a.hasta !== a.desde ? ` al ${fechaCorta(a.hasta).slice(0, 5)}` : ""})</li>`).join("")}
+            <li>Saldo inicial ${pesos(lb.saldo_inicial)} → final ${pesos(lb.saldo_final)} <span class="cb-ok">los resúmenes empalman ✓</span></li>
+          </ul>` : ""}
+        ${editable ? (cab.resumen.length
+          ? `<div class="cb-botones"><button type="button" class="conc-boton secundario" data-subir="resumen">Agregar o reemplazar un resumen</button></div>`
+          : zonaSoltar("resumen", "Arrastrá acá el PDF del resumen del banco")) : ""}`;
+
+      // Leer y comparar
+      const zona = document.getElementById("zonaLeer");
+      if (cab.bloqueado) {
+        zona.innerHTML = "";
+      } else if (p?.estado === "procesando") {
+        zona.innerHTML = `<p class="cb-leyendo">Leyendo los papeles… puede tardar hasta un minuto.</p>`;
+      } else if (cab.mayor && cab.resumen.length && editable) {
+        zona.innerHTML = `
+          ${p?.estado === "con_error" ? `<div class="conc-aviso conc-aviso-error">No se pudo leer: ${esc(p.mensajeError || "")}</div>` : ""}
+          <button type="button" class="conc-boton cb-boton-grande" id="btnLeer">
+            ${p && p.estado !== "con_error" ? "Volver a leer los papeles" : "Leer y comparar"}</button>
+          <p class="cb-gris">Comparar no concilia nada: arma propuestas para que vos decidas.
+            ${p && p.estado !== "con_error" ? "Lo que ya conciliaste se conserva." : ""}</p>`;
+        document.getElementById("btnLeer").addEventListener("click", leer);
+      } else {
+        zona.innerHTML = p?.estado === "cerrado" ? "" : `<p class="cb-gris">Cuando estén los dos papeles se van a poder comparar.</p>`;
+      }
+    }
+
+    function zonaSoltar(tipo, texto) {
+      return `<div class="cb-soltar" data-subir="${tipo}">${texto}<br><small>o hacé clic para elegirlo</small></div>`;
+    }
+
+    // Subir: clic o arrastrar sobre la zona del papel.
+    const selector = document.getElementById("selectorArchivo");
+    let tipoASubir = null;
+    document.getElementById("paso1").addEventListener("click", (e) => {
+      const b = e.target.closest("[data-subir]");
+      if (!b) return;
+      tipoASubir = b.dataset.subir;
+      selector.value = "";
+      selector.click();
+    });
+    selector.addEventListener("change", () => selector.files[0] && subir(selector.files[0], tipoASubir));
+    window.addEventListener("dragover", (e) => e.preventDefault());
+    window.addEventListener("drop", (e) => e.preventDefault());
+    document.getElementById("paso1").addEventListener("dragover", (e) => {
+      const z = e.target.closest(".cb-papel");
+      if (z) { e.preventDefault(); z.classList.add("cb-arrastrando"); }
+    });
+    document.getElementById("paso1").addEventListener("dragleave", (e) => e.target.closest?.(".cb-papel")?.classList.remove("cb-arrastrando"));
+    document.getElementById("paso1").addEventListener("drop", (e) => {
+      const z = e.target.closest(".cb-papel");
+      document.querySelectorAll(".cb-arrastrando").forEach((x) => x.classList.remove("cb-arrastrando"));
+      if (!z || !e.dataTransfer.files[0]) return;
+      subir(e.dataTransfer.files[0], z.id === "papelMayor" ? "mayor" : "resumen");
+    });
+
+    async function subir(archivo, tipo, reemplazar = false, parte = undefined) {
+      if (!/\.pdf$/i.test(archivo.name)) return aviso("error", "Tiene que ser un archivo PDF.");
+      if (tipo === "mayor" && cab.bloqueado) return aviso("error", "En este mes sólo se carga el resumen del banco.");
+      if (BANCO === "SANTAFE" && tipo === "resumen" && parte === undefined) {
+        parte = await preguntar(`¿"${archivo.name}" es el resumen de todo el mes o de una quincena?`, [
+          { valor: "", texto: "Todo el mes" }, { valor: "1", texto: "1ª quincena" }, { valor: "2", texto: "2ª quincena" },
+          { valor: null, texto: "Cancelar", secundario: true }]);
+        if (parte === null) return;
+      }
+      const form = new FormData();
+      form.append("banco", BANCO);
+      form.append("anio", ANIO);
+      form.append("mes", MES);
+      form.append("tipo", tipo);
+      if (parte) form.append("parte", parte);
+      if (reemplazar) form.append("reemplazar", "1");
+      form.append("archivo", archivo);
+      document.getElementById("avisos").innerHTML = "";
+      aviso("info", `Leyendo "${archivo.name}"…`);
+      try {
+        const respuesta = await fetch("/api/conciliacion/archivo", { method: "POST", body: form });
+        const r = await respuesta.json();
+        document.getElementById("avisos").innerHTML = "";
+        if (respuesta.status === 409 && r.confirmar) {
+          if (await preguntar(r.mensaje, [{ valor: true, texto: "Reemplazar" }, { valor: false, texto: "Cancelar", secundario: true }])) {
+            subir(archivo, tipo, true, parte);
+          }
+          return;
+        }
+        if (!respuesta.ok) throw new Error(r.error || "No se pudo subir el archivo.");
+        await cargar();
+        aviso("ok", r.mensaje + (r.aviso ? ` ${r.aviso}` : ""));
+      } catch (error) {
+        document.getElementById("avisos").innerHTML = "";
+        aviso("error", error.message);
+      }
+    }
+
+    async function leer() {
+      if (cab.periodo && cab.periodo.estado !== "con_error") {
+        const ok = await preguntar("¿Volver a leer los papeles? Lo que ya conciliaste se conserva. Si algún renglón " +
+          "ya no está en el PDF nuevo, eso se deshace y se avisa.", [
+          { valor: true, texto: "Volver a leer" }, { valor: false, texto: "Cancelar", secundario: true }]);
+        if (!ok) return;
+      }
+      try {
+        await pedirJson("/api/conciliacion/procesar", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ banco: BANCO, anio: ANIO, mes: MES }),
+        });
+      } catch (error) {
+        return aviso("error", error.message);
+      }
+      paso = null;
+      cargar();
+    }
+
+    // ============================================================ Paso 2
+
+    function listas() {
+      const texto = document.getElementById("buscar").value.trim().toLowerCase();
+      const comoNumero = texto.replace(/\./g, "").replace(",", ".");
+      const coincide = (m) => !texto
+        || `${m.concepto} ${m.detalle || ""} ${m.nro || ""}`.toLowerCase().includes(texto)
+        || (/^-?\d+(\.\d+)?$/.test(comoNumero) && Math.abs(Number(m.importe)).toFixed(2).startsWith(comoNumero));
+      const porFecha = (a, b) => a.fecha.localeCompare(b.fecha) || a.orden - b.orden;
+      const movs = datos.movimientos.filter((m) => Number(m.importe) !== 0);
+      const conMovs = (c) => c.items.map((id) => porId.get(id)).filter(Boolean);
+      const fechaDe = (c) => (conMovs(c).find(esMayor) || conMovs(c)[0])?.fecha || "";
+      const cruceCoincide = (c) => conMovs(c).some(coincide);
+
+      const propuestas = datos.cruces.filter((c) => c.estado === "a_confirmar" && cruceCoincide(c))
+        .sort((a, b) => fechaDe(a).localeCompare(fechaDe(b)));
+      return {
+        propuestas,
+        sinPar: movs.filter((m) => ["M", "R", "B", "Q"].includes(m.lado) && !m.rubro_gasto
+          && estadoDe.get(m.id) === "sin_par" && coincide(m)).sort(porFecha),
+        anteriores: datos.cuadre.con_arrastre ? [] : movs.filter((m) => m.lado === "A"
+          && estadoDe.get(m.id) === "sin_par" && coincide(m)).sort(porFecha),
+        gastos: gastosSueltos().filter(coincide).sort(porFecha),
+        mesSiguiente: datos.cruces.filter((c) => c.estado === "mes_siguiente" && cruceCoincide(c))
+          .sort((a, b) => fechaDe(a).localeCompare(fechaDe(b))),
+        conciliados: datos.cruces.filter((c) => c.estado === "conciliado" && cruceCoincide(c))
+          .sort((a, b) => fechaDe(a).localeCompare(fechaDe(b))),
+      };
+    }
+
+    // Gastos e impuestos del banco que no están en ningún cruce: ni conciliados,
+    // ni dentro de una propuesta (ésos se ven en "Propuestas", no se repiten acá).
+    const esGastoBanco = (m) => (m.lado === "B" || m.lado === "Q") && m.rubro_gasto && Number(m.importe) !== 0;
+    const gastosSueltos = () => datos.movimientos.filter((m) => esGastoBanco(m) && estadoDe.get(m.id) === "sin_par");
+    const sumar = (l) => l.reduce((t, m) => t + Math.round(Number(m.importe) * 100), 0) / 100;
+    let gastosAMano = false;   // mostrar las herramientas para conciliar gastos a mano
+
+    function pintarConciliar() {
+      const c = datos.cuadre.conteo;
+      const contador = (titulo, x) => `<div class="cb-contador">
+          <span>${titulo}</span>
+          <strong>${x.conciliados} de ${x.total}</strong>
+          <small>conciliados · ${x.propuestos} con propuesta · ${x.sin_par} sin par${x.mes_siguiente ? ` · ${x.mes_siguiente} al mes siguiente` : ""}</small>
+        </div>`;
+      const sueltos = gastosSueltos();
+      document.getElementById("contadores").innerHTML =
+        contador("Asientos del mayor", c.mayor) +
+        contador("Movimientos del banco", c.banco) +
+        `<div class="cb-contador">
+          <span>Gastos e impuestos del banco</span>
+          <strong>${sueltos.length} por ${pesos(sumar(sueltos))}</strong>
+          <small>${sueltos.length ? "se asientan el mes siguiente" : "no queda ninguno sin asiento"}</small>
+        </div>` +
+        (c.arrastrados.total ? contador("Pendientes del mes anterior", c.arrastrados) : "");
+
+      const l = listas();
+      const tabs = [
+        ["propuestas", "Propuestas", l.propuestas.length],
+        ["sinpar", "Sin par", l.sinPar.length],
+        ["gastos", "Gastos del banco", l.gastos.length],
+        ["messiguiente", "Mes siguiente", l.mesSiguiente.length],
+        ["conciliados", "Conciliados", l.conciliados.length],
+      ];
+      document.getElementById("secciones").innerHTML = tabs.map(([id, texto, n]) =>
+        `<button type="button" data-seccion="${id}" class="${seccion === id ? "activo" : ""}">${texto} <span>${n}</span></button>`).join("");
+
+      const cont = document.getElementById("contenidoSeccion");
+      if (seccion === "propuestas") cont.innerHTML = htmlPropuestas(l.propuestas);
+      if (seccion === "sinpar") cont.innerHTML = htmlSinPar(l.sinPar, l.anteriores);
+      if (seccion === "gastos") cont.innerHTML = htmlGastos(l.gastos);
+      if (seccion === "messiguiente") cont.innerHTML = htmlCruces(l.mesSiguiente, "Renglones marcados «Se registra el mes siguiente». Siguen pendientes y pasan al mes siguiente al cerrar.");
+      if (seccion === "conciliados") cont.innerHTML = htmlCruces(l.conciliados, "");
+    }
+
+    document.getElementById("secciones").addEventListener("click", (e) => {
+      const b = e.target.closest("button[data-seccion]");
+      if (!b) return;
+      seccion = b.dataset.seccion;
+      mostrar = POR_PAGINA;
+      pintarConciliar();
+    });
+    let relojBuscar;
+    document.getElementById("buscar").addEventListener("input", () => {
+      clearTimeout(relojBuscar);
+      relojBuscar = setTimeout(() => { mostrar = POR_PAGINA; pintarConciliar(); }, 250);
+    });
+
+    // --- Renglones
+
+    function renglon(m, opciones = {}) {
+      const elegible = opciones.elegible && abierto();
+      const detalle = m.detalle ? `<small>${esc(m.detalle)}</small>` : "";
+      // Mayor y banco ya se distinguen por la columna: la etiqueta es sólo para
+      // lo que viene del mes anterior.
+      const lado = m.lado === "M" || m.lado === "B" ? "" : `<span class="cb-lado">${NOMBRE_LADO[m.lado]}</span>`;
+      const notas = (m.obs ? ` <span class="conc-ind">💬${m.obs}</span>` : "");
+      return `<div class="cb-mov ${elegidos.has(m.id) ? "cb-elegido" : ""}" data-mov="${m.id}">
+        ${elegible ? `<input type="checkbox" class="cb-check" data-elegir="${m.id}" ${elegidos.has(m.id) ? "checked" : ""} title="Elegir para conciliar a mano" />` : ""}
+        <span class="cb-fecha">${fechaCorta(m.fecha).slice(0, 5)}</span>
+        <span class="cb-concepto">${lado}${esc(m.concepto)}${m.nro ? ` <small class="cb-gris">asiento ${esc(m.nro)}</small>` : ""}
+          ${etiquetaSocio(m, datos)}${notas}${detalle}</span>
+        <span class="cb-importe ${Number(m.importe) < 0 ? "cb-negativo" : ""}">${importe(m.importe)}</span>
+        ${opciones.acciones || ""}
+      </div>`;
+    }
+
+    const MAX_RENGLONES_PAR = 5;
+    function ladoDelPar(titulo, movs) {
+      if (!movs.length) return `<div class="cb-par-lado"><span class="cb-par-titulo">${titulo}</span><span class="cb-gris">—</span></div>`;
+      if (movs.length <= MAX_RENGLONES_PAR) {
+        return `<div class="cb-par-lado"><span class="cb-par-titulo">${titulo}</span>${movs.map((m) => renglon(m)).join("")}</div>`;
+      }
+      // Muchos renglones (típico: el asiento global de gastos contra todos los
+      // gastos e impuestos del resumen): se muestra el total y por rubro.
+      const grupos = new Map();
+      for (const m of movs) {
+        const clave = m.rubro_gasto || "Otros movimientos";
+        if (!grupos.has(clave)) grupos.set(clave, []);
+        grupos.get(clave).push(m);
+      }
+      const fechas = movs.map((m) => m.fecha).sort();
+      return `<div class="cb-par-lado"><span class="cb-par-titulo">${titulo}</span>
+        <div class="cb-mov"><span class="cb-concepto"><strong>${movs.length} renglones</strong>
+          <span class="cb-gris">del ${fechaCorta(fechas[0]).slice(0, 5)} al ${fechaCorta(fechas[fechas.length - 1]).slice(0, 5)}</span></span>
+          <span class="cb-importe ${sumar(movs) < 0 ? "cb-negativo" : ""}">${importe(sumar(movs))}</span></div>
+        ${[...grupos].map(([g, l]) => `<div class="cb-mov cb-gris"><span class="cb-concepto">${esc(g)} (${l.length})</span>
+          <span class="cb-importe">${importe(sumar(l))}</span></div>`).join("")}
+        <details class="cb-detalle-par"><summary>Ver los ${movs.length} renglones</summary>${movs.map((m) => renglon(m)).join("")}</details>
+      </div>`;
+    }
+
+    function masResultados(total) {
+      return total > mostrar ? `<button type="button" class="conc-boton secundario cb-mas" id="btnMas">Ver ${Math.min(POR_PAGINA, total - mostrar)} más (quedan ${total - mostrar})</button>` : "";
+    }
+
+    function htmlPropuestas(lista) {
+      if (!lista.length) return `<p class="cb-vacio">No hay propuestas para revisar.</p>`;
+      const exactas = lista.filter((c) => c.exacta);
+      const visibles = lista.filter((c) => filtroPropuestas === "todas" || (filtroPropuestas === "exactas") === c.exacta);
+      return `
+        <div class="cb-explica">
+          El sistema encontró estos pares. <strong>Ninguno está conciliado todavía:</strong> revisá cada uno y tocá
+          <strong>Conciliar</strong> si está bien, o <strong>No es</strong> si no corresponde.
+        </div>
+        ${exactas.length && abierto() ? `<div class="cb-masivo">
+            <span><strong>${exactas.length}</strong> propuestas exactas: mismo importe y hasta 2 días hábiles de diferencia
+            (sin contar sábados ni domingos).</span>
+            <button type="button" class="conc-boton" id="btnExactas">✓ Conciliar las ${exactas.length} exactas</button>
+          </div>` : ""}
+        <div class="cb-filtro">
+          ${[["todas", `Todas (${lista.length})`], ["exactas", `Exactas (${exactas.length})`], ["otras", `Para mirar con atención (${lista.length - exactas.length})`]]
+            .map(([v, t]) => `<label><input type="radio" name="filtroProp" value="${v}" ${filtroPropuestas === v ? "checked" : ""} /> ${t}</label>`).join("")}
+        </div>
+        ${visibles.slice(0, mostrar).map(htmlPropuesta).join("")}
+        ${masResultados(visibles.length)}`;
+    }
+
+    function motivo(c) {
+      if (c.exacta) {
+        return c.dias_habiles === 0 ? "Mismo importe, mismo día"
+          : `Mismo importe, ${c.dias_habiles} día${c.dias_habiles > 1 ? "s" : ""} hábil${c.dias_habiles > 1 ? "es" : ""} de diferencia`;
+      }
+      return `${c.regla}${c.nota ? ` — ${c.nota}` : ""}`;
+    }
+
+    function htmlPropuesta(c) {
+      const movs = c.items.map((id) => porId.get(id)).filter(Boolean);
+      return `<div class="cb-par ${c.exacta ? "" : "cb-par-mirar"}">
+        ${ladoDelPar("Mayor", movs.filter(esMayor))}
+        ${ladoDelPar("Banco", movs.filter((m) => !esMayor(m)))}
+        <div class="cb-par-pie">
+          <span class="cb-motivo">${esc(motivo(c))}</span>
+          ${abierto() ? `<button type="button" class="conc-boton" data-aceptar="${c.id}">✓ Conciliar</button>
+            <button type="button" class="conc-boton secundario" data-rechazar="${c.id}">✗ No es</button>` : ""}
+        </div>
+      </div>`;
+    }
+
+    function htmlSinPar(lista, anteriores) {
+      const acciones = (m) => abierto() ? `<span class="cb-acciones">
+          <button type="button" class="conc-boton secundario" data-detalle="${m.id}">Buscar par</button>
+          ${m.lado === "M" || m.lado === "B" ? `<button type="button" class="conc-boton secundario" data-messig="${m.id}" title="Ej.: del banco del 30, que se asienta el 1 del mes siguiente">Mes siguiente</button>` : ""}
+        </span>` : `<span class="cb-acciones"><button type="button" class="conc-boton secundario" data-detalle="${m.id}">Ver</button></span>`;
+      const mayor = lista.filter(esMayor);
+      const banco = lista.filter((m) => !esMayor(m));
+      return `
+        <div class="cb-explica">
+          Renglones que no tienen ningún par propuesto. Tocá <strong>Buscar par</strong> para ver posibles
+          coincidencias, o tildá varios (por ejemplo 1 del mayor y 3 del banco) y conciliá juntos.
+          <strong>Mes siguiente</strong>: para lo de los últimos días que se registra el mes que viene.
+        </div>
+        <div class="cb-columnas">
+          <div><h3>En el mayor y no en el banco <span class="cb-gris">(${mayor.length})</span></h3>
+            ${mayor.map((m) => renglon(m, { elegible: true, acciones: acciones(m) })).join("") || '<p class="cb-vacio">Nada.</p>'}</div>
+          <div><h3>En el banco y no en el mayor <span class="cb-gris">(${banco.length})</span></h3>
+            ${banco.map((m) => renglon(m, { elegible: true, acciones: acciones(m) })).join("") || '<p class="cb-vacio">Nada.</p>'}</div>
+        </div>
+        ${anteriores.length ? `<details class="cb-anteriores">
+            <summary>Últimos días del resumen del mes anterior (${anteriores.length}) — por si un asiento de los primeros días está ahí</summary>
+            ${anteriores.map((m) => renglon(m, { elegible: true })).join("")}
+          </details>` : ""}`;
+    }
+
+    function htmlGastos(lista) {
+      const enPropuesta = datos.movimientos.filter((m) => esGastoBanco(m) && estadoDe.get(m.id) === "propuesto").length;
+      const yaEnPropuesta = enPropuesta ? `<p class="cb-gris">Otros ${enPropuesta} gastos e impuestos ya están dentro de una
+        propuesta (pestaña «Propuestas», junto con su asiento del mayor): no se repiten acá.</p>` : "";
+      if (!lista.length) return `<p class="cb-vacio">No queda ningún gasto ni impuesto del banco sin asiento.</p>${yaEnPropuesta}`;
+      const rubros = new Map();
+      const dias = new Map();
+      for (const m of lista) {
+        if (!rubros.has(m.rubro_gasto)) rubros.set(m.rubro_gasto, []);
+        rubros.get(m.rubro_gasto).push(m);
+        if (!dias.has(m.fecha)) dias.set(m.fecha, []);
+        dias.get(m.fecha).push(m);
+      }
+      const aMano = gastosAMano && abierto();
+      const asientosGastos = datos.movimientos.filter((m) => esMayor(m) && estadoDe.get(m.id) === "sin_par"
+        && /BANC|GASTO|COMIS|IMP|LEY|SIRCREB|IVA|INTERES|SEGUR/i.test(m.concepto));
+      return `
+        <div class="cb-explica">
+          <strong>${lista.length} gastos, comisiones e impuestos por ${pesos(sumar(lista))}</strong> que el banco debitó y
+          todavía no tienen asiento en el mayor. <strong>Es lo normal y no hay que hacer nada con ellos ahora:</strong>
+          se asientan todos juntos el mes siguiente. Al cerrar el mes pasan solos al mes que viene, y ahí el sistema
+          los propone contra ese asiento.
+        </div>
+        ${yaEnPropuesta}
+        <table class="cb-tabla">
+          <thead><tr><th>Rubro</th><th class="num">Cantidad</th><th class="num">Total</th>${aMano ? "<th></th>" : ""}</tr></thead>
+          <tbody>${[...rubros].map(([r, l]) => `<tr><td>${esc(r)}</td><td class="num">${l.length}</td>
+              <td class="num">${importe(sumar(l))}</td>
+              ${aMano ? `<td><button type="button" class="conc-boton secundario" data-elegir-grupo="${esc(r)}" data-tipo-grupo="rubro">Tildar todos</button></td>` : ""}</tr>`).join("")}</tbody>
+          <tfoot><tr><td>Total</td><td class="num">${lista.length}</td><td class="num">${importe(sumar(lista))}</td>${aMano ? "<td></td>" : ""}</tr></tfoot>
+        </table>
+        ${aMano && asientosGastos.length ? `<h3>Asientos del mayor que pueden ser de gastos</h3>
+          ${asientosGastos.map((m) => renglon(m, { elegible: true })).join("")}` : ""}
+        <h3>Detalle por día</h3>
+        ${[...dias].map(([fecha, l]) => `<details class="cb-dia">
+            <summary>${fechaCorta(fecha)} · ${l.length} renglones · <strong>${importe(sumar(l))}</strong>
+              ${aMano ? `<button type="button" class="conc-boton secundario" data-elegir-grupo="${fecha}" data-tipo-grupo="dia">Tildar el día</button>` : ""}</summary>
+            ${l.map((m) => renglon(m, { elegible: aMano })).join("")}
+          </details>`).join("")}
+        ${abierto() ? `<p class="cb-gris cb-a-mano">${aMano
+            ? "Tildá el asiento del mayor y los gastos que incluye (un rubro o un día entero) y tocá Conciliar."
+            : "¿Alguno sí se asentó este mismo mes?"}
+          <button type="button" class="conc-boton secundario" id="btnGastosAMano">${aMano ? "Listo, ocultar" : "Conciliar gastos a mano"}</button></p>` : ""}`;
+    }
+
+    function htmlCruces(lista, explicacion) {
+      if (!lista.length) return `<p class="cb-vacio">Nada por acá.</p>`;
+      return `${explicacion ? `<div class="cb-explica">${explicacion}</div>` : ""}
+        ${lista.slice(0, mostrar).map((c) => {
+          const movs = c.items.map((id) => porId.get(id)).filter(Boolean);
+          const quien = c.resuelto_por_nombre || c.creado_por_nombre;
+          return `<div class="cb-par cb-par-hecho">
+            ${ladoDelPar("Mayor", movs.filter(esMayor))}
+            ${ladoDelPar("Banco", movs.filter((m) => !esMayor(m)))}
+            <div class="cb-par-pie">
+              <span class="cb-motivo">${esc(c.regla)}${Number(c.diferencia) ? ` · diferencia ${importe(c.diferencia)}` : ""}${quien ? ` · ${esc(quien)}` : ""}</span>
+              ${abierto() ? `<button type="button" class="conc-boton secundario" data-deshacer="${c.id}">Deshacer</button>` : ""}
+            </div>
+          </div>`;
+        }).join("")}
+        ${masResultados(lista.length)}`;
+    }
+
+    // --- Acciones del paso 2
+
+    document.getElementById("contenidoSeccion").addEventListener("click", async (e) => {
+      const t = e.target;
+      if (t.id === "btnMas") { mostrar += POR_PAGINA; return pintarConciliar(); }
+      if (t.id === "btnExactas") return conciliarExactas();
+      if (t.id === "btnGastosAMano") { gastosAMano = !gastosAMano; return pintarConciliar(); }
+      if (t.dataset.aceptar) return accionCruce(Number(t.dataset.aceptar), "aceptar");
+      if (t.dataset.rechazar) return accionCruce(Number(t.dataset.rechazar), "rechazar");
+      if (t.dataset.deshacer) {
+        const ok = await preguntar("¿Deshacer? Los renglones vuelven a quedar sin conciliar.", [
+          { valor: true, texto: "Deshacer" }, { valor: false, texto: "Cancelar", secundario: true }]);
+        return ok && accionCruce(Number(t.dataset.deshacer), "deshacer");
+      }
+      if (t.dataset.messig) return mesSiguiente(Number(t.dataset.messig));
+      if (t.dataset.detalle) return abrirPanel(Number(t.dataset.detalle));
+      if (t.dataset.elegirGrupo !== undefined) {
+        e.preventDefault();
+        const l = listas().gastos.filter((m) => (t.dataset.tipoGrupo === "rubro" ? m.rubro_gasto : m.fecha) === t.dataset.elegirGrupo);
+        const todos = l.every((m) => elegidos.has(m.id));
+        l.forEach((m) => (todos ? elegidos.delete(m.id) : elegidos.add(m.id)));
+        pintarConciliar();
+        return actualizarBarra();
+      }
+      if (t.dataset.elegir) {
+        const id = Number(t.dataset.elegir);
+        t.checked ? elegidos.add(id) : elegidos.delete(id);
+        t.closest(".cb-mov").classList.toggle("cb-elegido", t.checked);
+        actualizarBarra();
+      }
+    });
+    document.getElementById("contenidoSeccion").addEventListener("change", (e) => {
+      if (e.target.name === "filtroProp") { filtroPropuestas = e.target.value; mostrar = POR_PAGINA; pintarConciliar(); }
+    });
+
+    async function ejecutar(url, opciones, despues) {
+      try {
+        const r = await pedirJson(url, opciones);
+        if (despues) despues(r);
+      } catch (error) {
+        await preguntar(error.message, [{ valor: true, texto: "Entendido" }]);
+      }
+      const y = window.scrollY;
+      await cargar();
+      window.scrollTo(0, y);
+    }
+
+    function accionCruce(id, accion) {
+      return ejecutar(`/api/conciliacion/cruces/${id}/${accion}`, { method: "POST" });
+    }
+
+    async function conciliarExactas() {
+      const exactas = listas().propuestas.filter((c) => c.exacta);
+      const ok = await preguntar(`Se van a conciliar ${exactas.length} propuestas con el mismo importe y hasta 2 días ` +
+        "hábiles de diferencia. Después podés deshacer cualquiera desde «Conciliados».", [
+        { valor: true, texto: `Conciliar ${exactas.length}` }, { valor: false, texto: "Cancelar", secundario: true }]);
+      if (!ok) return;
+      await ejecutar(`/api/conciliacion/periodos/${datos.periodo.id}/aceptar-exactas`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ cruces: exactas.map((c) => c.id) }),
+      }, (r) => setTimeout(() => aviso("ok", `Se conciliaron ${r.cantidad} propuestas.`), 0));
+    }
+
+    async function mesSiguiente(id) {
+      const m = porId.get(id);
+      const ok = await preguntar(`«${m.concepto}» del ${fechaCorta(m.fecha)}: ¿se registra el mes siguiente? ` +
+        "Queda pendiente (no se concilia), pasa al mes que viene al cerrar y ahí se cruza.", [
+        { valor: true, texto: "Sí, mes siguiente" }, { valor: false, texto: "Cancelar", secundario: true }]);
+      if (ok) await ejecutar(`/api/conciliacion/movimientos/${id}/mes-siguiente`, { method: "POST" });
+    }
+
+    // --- Elegir varios y conciliar a mano
+
+    function sumas() {
+      const movs = [...elegidos].map((id) => porId.get(id)).filter(Boolean);
+      const cent = (l) => l.reduce((s, m) => s + Math.round(Number(m.importe) * 100), 0);
+      const mayor = movs.filter(esMayor);
+      const banco = movs.filter((m) => !esMayor(m));
+      return { mayor, banco, sm: cent(mayor) / 100, sb: cent(banco) / 100, dif: (cent(mayor) - cent(banco)) / 100 };
+    }
+
+    function actualizarBarra() {
+      const barra = document.getElementById("barraSeleccion");
+      barra.hidden = !elegidos.size || paso !== 2 || !abierto();
+      if (barra.hidden) return;
+      const s = sumas();
+      document.getElementById("selMayor").textContent = `${s.mayor.length} · ${pesos(s.sm)}`;
+      document.getElementById("selBanco").textContent = `${s.banco.length} · ${pesos(s.sb)}`;
+      const unLado = !s.mayor.length || !s.banco.length;
+      const dif = unLado ? s.sm + s.sb : s.dif;
+      const el = document.getElementById("selDif");
+      el.textContent = pesos(dif);
+      el.className = Math.abs(dif) < 0.005 ? "conc-dif-ok" : "conc-dif-mal";
+    }
+
+    document.getElementById("btnLimpiar").addEventListener("click", () => {
+      elegidos.clear();
+      pintar();
+    });
+
+    document.getElementById("btnConciliarElegidos").addEventListener("click", () => conciliarAMano([...elegidos]));
+
+    async function conciliarAMano(ids) {
+      const movs = ids.map((id) => porId.get(id)).filter(Boolean);
+      const cent = (l) => l.reduce((s, m) => s + Math.round(Number(m.importe) * 100), 0);
+      const mayor = movs.filter(esMayor);
+      const banco = movs.filter((m) => !esMayor(m));
+      if (!mayor.length || !banco.length) {
+        if (cent(movs) !== 0) {
+          return preguntar("Elegiste renglones de un solo lado y no se anulan entre sí. Elegí también los del otro lado.",
+            [{ valor: true, texto: "Entendido" }]);
+        }
+      } else if (cent(mayor) !== cent(banco)) {
+        const ok = await preguntar(`Entre el mayor y el banco hay una diferencia de ${pesos((cent(mayor) - cent(banco)) / 100)}. ` +
+          "¿Conciliar igual? La diferencia queda registrada.", [
+          { valor: true, texto: "Conciliar con diferencia" }, { valor: false, texto: "Cancelar", secundario: true }]);
+        if (!ok) return;
+      }
+      await ejecutar(`/api/conciliacion/periodos/${datos.periodo.id}/cruces`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ movimientos: ids }),
+      }, () => { ids.forEach((id) => elegidos.delete(id)); cerrarPanel(); });
+    }
+
+    // --- Panel de un renglón
+
+    const panel = document.getElementById("panel");
+    let panelId = null;
+    function cerrarPanel() { panel.hidden = true; panelId = null; }
+    document.getElementById("btnCerrarPanel").addEventListener("click", cerrarPanel);
+
+    const lineaCandidato = (m) => `<div class="conc-panel-mov"><span>${NOMBRE_LADO[m.lado]} · ${fechaCorta(m.fecha)}</span>
+      <span>${esc(m.concepto)}</span><strong>${importe(m.importe)}</strong></div>`;
+
+    async function abrirPanel(id) {
+      panelId = id;
+      panel.hidden = false;
+      const cont = document.getElementById("panelContenido");
+      cont.innerHTML = `<p class="conc-cargando">Buscando…</p>`;
+      let d;
+      try {
+        d = await pedirJson(`/api/conciliacion/movimientos/${id}`);
+      } catch (error) {
+        cont.innerHTML = `<p class="conc-aviso conc-aviso-error">${esc(error.message)}</p>`;
+        return;
+      }
+      if (panelId !== id) return;
+      const m = d.movimiento;
+      const local = porId.get(m.id) || m;
+      const textoEstado = { conciliado: "Conciliado", mes_siguiente: "Se registra el mes siguiente",
+        propuesto: "Tiene una propuesta (en «Propuestas»)", sin_par: "Sin conciliar" }[d.estado];
+      const pares = d.sugerencias.filter((s) => s.movimientos.length);
+      const notas = d.sugerencias.filter((s) => !s.movimientos.length);
+
+      cont.innerHTML = `
+        <h3>${NOMBRE_LADO[m.lado]} · ${fechaCorta(m.fecha)}</h3>
+        <p class="conc-panel-concepto">${esc(m.concepto)} ${etiquetaSocio({ ...local, lado: m.lado }, datos)}</p>
+        ${m.detalle ? `<p class="conc-panel-nota">${esc(m.detalle)}</p>` : ""}
+        <p class="conc-panel-importe">${pesos(m.importe)}${m.nro ? ` <small>asiento ${esc(m.nro)}</small>` : ""}</p>
+        <p class="cb-estado">${textoEstado}</p>
+        ${d.abierto && (d.estado === "conciliado" || d.estado === "mes_siguiente") && d.cruceId
+          ? `<button type="button" data-p-deshacer="${d.cruceId}">Deshacer</button>` : ""}
+        ${d.abierto && d.pendiente && (m.lado === "M" || m.lado === "B")
+          ? `<button type="button" class="secundario" data-p-messig="${m.id}">Se registra el mes siguiente</button>` : ""}
+
+        ${d.pendiente ? `<h4>Posibles pares</h4>
+          ${pares.length ? pares.map((s, i) => `<div class="conc-sugerencia">
+              <div class="conc-sugerencia-titulo">${esc(s.texto)}</div>
+              ${s.movimientos.map(lineaCandidato).join("")}
+              ${s.tipo === "otro_banco"
+                ? `<a href="/conciliacion-banco.html?banco=&anio=${ANIO}&mes=${MES}" data-p-otro="${s.periodoId}">Está en otro banco: revisalo allá</a>`
+                : d.abierto ? `<button type="button" data-p-es="${i}">Sí, es este</button>` : ""}
+            </div>`).join("") : `<p class="conc-panel-nota">No se encontró nada con el mismo importe, parecido o que sume lo mismo.</p>`}
+          ${notas.map((s) => `<p class="conc-panel-nota">💡 ${esc(s.texto)}</p>`).join("")}` : ""}
+
+        <h4>Observaciones</h4>
+        ${d.observaciones.length ? d.observaciones.map((o) => `<div class="conc-obs"><p>${esc(o.texto)}</p>
+          <small>${esc(o.usuario)} · ${new Date(o.fecha).toLocaleString("es-AR")}</small></div>`).join("")
+          : `<p class="conc-panel-nota">Sin observaciones.</p>`}
+        ${d.abierto ? `<textarea id="txtObs" rows="3" maxlength="1000" placeholder="Ej.: se pidió el comprobante al banco"></textarea>
+          <button type="button" id="btnObs">Agregar observación</button>` : ""}`;
+
+      cont.querySelectorAll("[data-p-es]").forEach((b) => b.addEventListener("click", () => {
+        const s = pares[Number(b.dataset.pEs)];
+        conciliarAMano([m.id, ...s.movimientos.map((x) => x.id)]);
+      }));
+      cont.querySelectorAll("[data-p-otro]").forEach((a) => a.addEventListener("click", (e) => {
+        e.preventDefault();
+        window.open(`/conciliacion-punteo.html?id=${a.dataset.pOtro}`, "_blank");
+      }));
+      cont.querySelector("[data-p-deshacer]")?.addEventListener("click", (e) => accionCruce(Number(e.target.dataset.pDeshacer), "deshacer").then(() => abrirPanel(id)));
+      cont.querySelector("[data-p-messig]")?.addEventListener("click", () => mesSiguiente(m.id).then(() => abrirPanel(id)));
+      document.getElementById("btnObs")?.addEventListener("click", async () => {
+        const texto = document.getElementById("txtObs").value.trim();
+        if (!texto) return;
+        await ejecutar(`/api/conciliacion/movimientos/${m.id}/observaciones`, {
+          method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ texto }),
+        });
+        abrirPanel(id);
+      });
+    }
+
+    // ============================================================ Paso 3
+
+    function pintarCierre() {
+      const c = datos.cuadre;
+      const k = c.conteo;
+      const p = datos.periodo;
+      const cierra = Math.abs(c.dif_final - c.sin_explicar_ini) < 0.005;
+      const linea = (texto, valor, clase = "") => `<tr class="${clase}"><td>${texto}</td><td class="num">${importe(valor)}</td></tr>`;
+      document.getElementById("cierre").innerHTML = `
+        <div class="cb-resumen-cierre">
+          <p>Conciliados: <strong>${k.mayor.conciliados} de ${k.mayor.total}</strong> asientos del mayor y
+            <strong>${k.banco.conciliados} de ${k.banco.total}</strong> movimientos del banco.</p>
+          <p>Quedan sin conciliar (pasan al mes siguiente al cerrar): ${c.pend_mayor} asientos (${pesos(c.tot_pend_mayor)})
+            y ${c.pend_banco} movimientos del banco (${pesos(c.tot_pend_banco)}).</p>
+          <p>Gastos e impuestos del banco todavía sin asiento: ${c.pend_gastos} por ${pesos(c.tot_gastos)}
+            (se asientan el mes siguiente y también pasan solos).</p>
+          ${c.propuestas ? `<p class="cb-alerta">Quedan <strong>${c.propuestas} propuestas sin revisar</strong>: conciliá o descartá cada una antes de cerrar.</p>` : ""}
+          <p class="${cierra ? "cb-ok" : "cb-alerta"}">${cierra
+            ? "✓ El control de saldos cierra: la diferencia al final es la misma que la del inicio."
+            : "La diferencia al final no coincide con la del inicio: revisá las partidas con diferencia."}</p>
+        </div>
+        <details class="conc-saldos" open>
+          <summary>Control de saldos</summary>
+          <table>
+            ${linea("Saldo inicial según banco", c.ini_banco)}
+            ${linea("Saldo inicial según mayor", c.ini_mayor)}
+            ${linea("Diferencia al inicio", c.dif_ini)}
+            ${linea(c.con_arrastre ? "Explicada por lo que quedó pendiente el mes anterior" : "Explicada por asientos que el banco registró el mes anterior", c.tot_mes_ant)}
+            ${linea("Diferencia inicial sin explicar", c.sin_explicar_ini, "conc-saldo-total")}
+            ${linea("Saldo final según mayor", c.fin_mayor)}
+            ${linea("(+/−) Movimientos del banco sin conciliar", c.tot_pend_banco)}
+            ${linea("(+/−) Gastos e impuestos sin conciliar", c.tot_gastos)}
+            ${linea("(−/+) Asientos del mayor sin conciliar", -c.tot_pend_mayor)}
+            ${linea("(−/+) Diferencias en lo conciliado", -c.difs)}
+            ${linea("Saldo del banco calculado", c.calculado, "conc-saldo-total")}
+            ${linea("Saldo final según banco", c.fin_banco, "conc-saldo-total")}
+            ${linea("Diferencia final", c.dif_final, "conc-saldo-total")}
+          </table>
+        </details>
+        <div class="cb-botones">
+          <a class="conc-boton secundario" href="/conciliacion-informe.html?id=${p.id}" target="_blank">🖨 Imprimir informe</a>
+          <a class="conc-boton secundario" href="/conciliacion-punteo.html?id=${p.id}" target="_blank">Ver todo junto, como en papel</a>
+          ${p.estado === "abierto" && datos.permiso?.puedeCerrar ? `<button type="button" class="conc-boton" id="btnCerrarMes" ${c.propuestas ? "disabled" : ""}>🔒 Cerrar el mes</button>` : ""}
+          ${p.estado === "cerrado" && datos.permiso?.esAdmin ? `<button type="button" class="conc-boton secundario" id="btnReabrir">Reabrir el mes</button>` : ""}
+        </div>`;
+
+      document.getElementById("btnCerrarMes")?.addEventListener("click", async () => {
+        const ok = await preguntar(`¿Cerrar ${cab.nombre} de ${NOMBRES_MES[MES - 1]} ${ANIO}? Lo que quedó sin conciliar pasa ` +
+          "al mes siguiente para cruzarlo ahí. Después el mes queda sólo para consulta.", [
+          { valor: true, texto: "🔒 Cerrar el mes" }, { valor: false, texto: "Cancelar", secundario: true }]);
+        if (ok) ejecutar(`/api/conciliacion/periodos/${p.id}/cerrar`, { method: "POST" });
+      });
+      document.getElementById("btnReabrir")?.addEventListener("click", async () => {
+        const ok = await preguntar("¿Reabrir este mes? Lo que había pasado al mes siguiente se retira de allá.", [
+          { valor: true, texto: "Reabrir" }, { valor: false, texto: "Cancelar", secundario: true }]);
+        if (ok) ejecutar(`/api/conciliacion/periodos/${p.id}/reabrir`, { method: "POST" });
+      });
+    }
+
+    cargar();
+  </script>
+</body>
+</html>

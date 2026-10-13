@@ -52,8 +52,16 @@ document.addEventListener("DOMContentLoaded", () => {
 // chat-flotante.js hace que la barra de chat (con sonido, cambio de título
 // y ventanitas tipo "viejo Facebook") aparezca en cualquier pantalla. Solo
 // chat.html queda afuera porque esa página YA ES el chat completo.
-(function () {
+// El chat se puede apagar para todos (Configuración, admin): si está
+// apagado, ni siquiera se carga la barra.
+(async function () {
   if (location.pathname === "/chat.html") return;
+  try {
+    const respuesta = await fetch("/api/ajustes");
+    if (!respuesta.ok || !(await respuesta.json()).chatActivo) return;
+  } catch (error) {
+    return;
+  }
   const script = document.createElement("script");
   script.src = "/chat-flotante.js";
   document.body.appendChild(script);

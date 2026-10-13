@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Conciliación bancaria — Información Mutual</title>
+  <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
+  <script>
+    (function () {
+      var t = localStorage.getItem("tema");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-izq">
+      <img src="/img/logo-blanco.png" alt="Logo Mutual" class="logo-barra" />
+      <h1>Conciliación bancaria</h1>
+      <span class="saludo" id="saludo"></span>
+    </div>
+  </header>
+
+  <main class="cb-main">
+    <nav class="cb-mes" aria-label="Mes">
+      <button type="button" id="btnMesAnterior" title="Mes anterior">◀</button>
+      <h2 id="tituloMes">…</h2>
+      <button type="button" id="btnMesSiguiente" title="Mes siguiente">▶</button>
+    </nav>
+    <p class="cb-ayuda" id="ayudaMes"></p>
+
+    <div id="avisos" class="conc-avisos"></div>
+    <div class="cb-tarjetas" id="tarjetas"><p class="conc-cargando">Cargando…</p></div>
+  </main>
+
+  <footer class="barra-inferior">
+    <a href="/" class="btn-inferior principal">◂ Menú principal</a>
+    <button id="btnSalir" class="btn-inferior peligro">Cerrar sesión</button>
+  </footer>
+
+  <script src="/comun.js"></script>
+  <script src="/conciliacion-comun.js"></script>
+  <script>
+    const params = new URLSearchParams(location.search);
+    let anio = Number(params.get("anio")) || null;
+    let mes = Number(params.get("mes")) || null;
+    let primerPeriodo = null;
+    let reloj = null;
+
+    document.getElementById("btnMesAnterior").addEventListener("click", () => mover(-1));
+    document.getElementById("btnMesSiguiente").addEventListener("click", () => mover(1));
+
+    function mover(delta) {
+      const total = anio * 12 + (mes - 1) + delta;
+      anio = Math.floor(total / 12);
+      mes = (total % 12) + 1;
+      cargar();
+    }
+
+    async function cargar() {
+      clearTimeout(reloj);
+      const consulta = anio && mes ? `?anio=${anio}&mes=${mes}` : "";
+      let d;
+      try {
+        d = await pedirJson(`/api/conciliacion/inicio${consulta}`);
+      } catch (error) {
+        document.getElementById("avisos").innerHTML = `<div class="conc-aviso conc-aviso-error">${esc(error.message)}</div>`;
+        return;
+      }
+      ({ anio, mes, primerPeriodo } = d);
+      history.replaceState(null, "", `?anio=${anio}&mes=${mes}`);
+      document.getElementById("tituloMes").textContent = `${NOMBRES_MES[mes - 1]} ${anio}`;
+      // Se puede ir hasta un mes antes del primero (para completar su resumen).
+      document.getElementById("btnMesAnterior").disabled =
+        anio * 12 + mes <= primerPeriodo.anio * 12 + primerPeriodo.mes - 1;
+      document.getElementById("ayudaMes").textContent = d.bloqueado
+        ? "Este mes es anterior al inicio de la conciliación en el sistema: sólo se usa su resumen del banco, " +
+          "para los movimientos de los primeros días del mes siguiente."
+        : "Elegí un banco. En cada uno se cargan los dos papeles (mayor y resumen), se comparan y se concilia.";
+      document.getElementById("tarjetas").innerHTML = d.bancos.map((b) => tarjeta(b, d.bloqueado)).join("");
+      if (d.bancos.some((b) => b.periodo?.estado === "procesando")) reloj = setTimeout(cargar, 4000);
+    }
+
+    // Qué le pasa al banco este mes, en una frase, y cuánto va hecho.
+    function tarjeta(b, bloqueado) {
+      const p = b.periodo;
+      let estado = "";
+      let detalle = "";
+      let clase = "";
+      let progreso = null;
+
+      if (bloqueado) {
+        estado = b.resumen.length ? "Resumen cargado" : "Sin resumen";
+        detalle = "Sólo se usa como mes anterior";
+        clase = "cb-tarjeta-gris";
+      } else if (p?.estado === "procesando") {
+        estado = "Leyendo los papeles…";
+        clase = "cb-tarjeta-azul";
+      } else if (p?.estado === "con_error") {
+        estado = "⚠ Hay un problema con los papeles";
+        detalle = "Entrá para ver qué pasa";
+        clase = "cb-tarjeta-roja";
+      } else if (p?.estado === "cerrado") {
+        estado = "✓ Mes cerrado";
+        detalle = p.fechaCierre ? `El ${new Date(p.fechaCierre).toLocaleDateString("es-AR")}${p.cerradoPor ? ` por ${p.cerradoPor}` : ""}` : "";
+        clase = "cb-tarjeta-verde";
+      } else if (p?.estado === "abierto") {
+        const total = p.mayorTotal + p.bancoTotal;
+        const hechos = p.mayorConciliados + p.bancoConciliados;
+        progreso = total ? Math.round((hechos * 100) / total) : 0;
+        if (p.pdfNuevos) {
+          estado = "Hay papeles sin usar";
+          detalle = "Entrá y tocá «Volver a leer»";
+          clase = "cb-tarjeta-azul";
+        } else if (p.avisoLectura) {
+          estado = "Falta el resumen del mes anterior";
+          detalle = "Sin él quedan asientos de los primeros días sin par";
+          clase = "cb-tarjeta-azul";
+        } else if (p.propuestas === 0 && p.aRevisar === 0) {
+          estado = "Todo revisado";
+          detalle = "Listo para cerrar el mes";
+          clase = "cb-tarjeta-verde";
+        } else {
+          estado = "En curso";
+          detalle = [p.propuestas ? `${p.propuestas} propuestas para revisar` : "",
+                     p.aRevisar ? `${p.aRevisar} renglones sin par` : ""].filter(Boolean).join(" · ");
+        }
+      } else if (b.mayor && b.resumen.length) {
+        estado = "Papeles cargados";
+        detalle = "Falta compararlos";
+        clase = "cb-tarjeta-azul";
+      } else {
+        estado = !b.mayor && !b.resumen.length ? "Faltan los papeles"
+          : !b.mayor ? "Falta el mayor" : "Falta el resumen del banco";
+        detalle = "Entrá para cargarlos";
+        clase = "cb-tarjeta-gris";
+      }
+
+      return `<a class="cb-tarjeta ${clase}" href="/conciliacion-banco.html?banco=${b.codigo}&anio=${anio}&mes=${mes}">
+        <span class="cb-tarjeta-banco">${esc(b.nombre)}</span>
+        <span class="cb-tarjeta-estado">${esc(estado)}</span>
+        ${detalle ? `<span class="cb-tarjeta-detalle">${esc(detalle)}</span>` : ""}
+        ${progreso !== null ? `<span class="cb-progreso" title="${progreso}% conciliado"><span style="width:${progreso}%"></span></span>
+          <span class="cb-tarjeta-detalle">${progreso}% conciliado</span>` : ""}
+      </a>`;
+    }
+
+    cargar();
+  </script>
+</body>
+</html>

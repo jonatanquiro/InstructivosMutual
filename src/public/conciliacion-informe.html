@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Informe de conciliación — Información Mutual</title>
+  <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
+  <!-- El informe es para imprimir: siempre en tema claro, sin barra ni chat -->
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body class="conc-informe">
+  <div class="conc-informe-acciones">
+    <button type="button" onclick="window.print()">🖨 Imprimir</button>
+    <a href="javascript:history.back()">◂ Volver</a>
+  </div>
+
+  <div id="avisos" class="conc-avisos"></div>
+  <article id="informe" hidden>
+    <header class="conc-informe-cabecera">
+      <img src="/img/logo-mutual.png" alt="" />
+      <div>
+        <h1 id="titulo"></h1>
+        <p id="subtitulo"></p>
+      </div>
+    </header>
+
+    <section>
+      <h2>Control de saldos</h2>
+      <table class="conc-informe-saldos" id="saldos"></table>
+    </section>
+
+    <section>
+      <h2>Resumen</h2>
+      <table class="conc-informe-tabla" id="resumen"></table>
+    </section>
+
+    <section>
+      <h2>Asientos del mayor que no están en el banco</h2>
+      <div id="pendMayor"></div>
+    </section>
+
+    <section>
+      <h2>Movimientos del banco sin contabilizar</h2>
+      <div id="pendBanco"></div>
+    </section>
+
+    <section>
+      <h2>Gastos e impuestos del banco sin contabilizar</h2>
+      <div id="gastos"></div>
+    </section>
+
+    <section>
+      <h2>Partidas conciliadas con diferencia de importe</h2>
+      <div id="diferencias"></div>
+    </section>
+
+    <section>
+      <h2>Conciliaciones hechas o confirmadas a mano</h2>
+      <div id="manuales"></div>
+    </section>
+
+    <section class="conc-informe-firmas">
+      <div><span></span>Preparó</div>
+      <div><span></span>Revisó</div>
+    </section>
+    <p class="conc-informe-pie" id="pie"></p>
+  </article>
+
+  <script src="/conciliacion-comun.js"></script>
+  <script>
+    const periodoId = Number(new URLSearchParams(location.search).get("id"));
+
+    function tabla(columnas, filas, total) {
+      if (!filas.length) return `<p class="conc-informe-vacio">No hay.</p>`;
+      return `<table class="conc-informe-tabla"><thead><tr>${columnas.map((c) =>
+          `<th class="${c.num ? "num" : ""}">${c.titulo}</th>`).join("")}</tr></thead>
+        <tbody>${filas.map((f) => `<tr>${f.map((v, i) =>
+          `<td class="${columnas[i].num ? "num" : ""}">${v}</td>`).join("")}</tr>`).join("")}</tbody>
+        ${total !== undefined ? `<tfoot><tr><td colspan="${columnas.length - 1}">Total</td>
+          <td class="num">${importe(total)}</td></tr></tfoot>` : ""}</table>`;
+    }
+
+    async function cargar() {
+      let d, observaciones;
+      try {
+        [d, observaciones] = await Promise.all([
+          pedirJson(`/api/conciliacion/periodos/${periodoId}`),
+          pedirJson(`/api/conciliacion/periodos/${periodoId}/observaciones`),
+        ]);
+      } catch (error) {
+        document.getElementById("avisos").innerHTML = `<div class="conc-aviso conc-aviso-error">${esc(error.message)}</div>`;
+        return;
+      }
+      const p = d.periodo;
+      const c = d.cuadre;
+      const obsPorMov = new Map();
+      for (const o of observaciones) {
+        if (!obsPorMov.has(o.movimiento_id)) obsPorMov.set(o.movimiento_id, []);
+        obsPorMov.get(o.movimiento_id).push(o);
+      }
+      const conObs = (m) => esc(m.concepto) +
+        (m.lado === "Q" || m.lado === "R" ? ` <em>(pendiente de ${fechaCorta(m.fecha).slice(3)})</em>` : "") +
+        (mesSiguiente.has(m.id) ? " <em>(se registra el mes siguiente)</em>" : "") +
+        (obsPorMov.get(m.id) || []).map((o) =>
+          `<div class="conc-informe-obs">Obs.: ${esc(o.texto)} — ${esc(o.usuario)}, ${new Date(o.fecha).toLocaleDateString("es-AR")}</div>`).join("");
+
+      document.title = `Conciliación ${p.bancoNombre} ${NOMBRES_MES[p.mes - 1]} ${p.anio}`;
+      document.getElementById("titulo").textContent =
+        `Conciliación bancaria — ${p.bancoNombre} — ${NOMBRES_MES[p.mes - 1]} ${p.anio}`;
+      document.getElementById("subtitulo").textContent =
+        (p.cuenta ? `Cuenta: ${p.cuenta}. ` : "") +
+        (p.estado === "cerrado"
+          ? `Mes cerrado por ${p.cerradoPor || "—"} el ${new Date(p.fechaCierre).toLocaleString("es-AR")}.`
+          : "Mes ABIERTO: este informe es provisorio.");
+
+      const linea = (texto, valor, clase = "") =>
+        `<tr class="${clase}"><td>${texto}</td><td class="num">${importe(valor)}</td></tr>`;
+      document.getElementById("saldos").innerHTML =
+        `<tr class="titulo"><td colspan="2">Al inicio</td></tr>` +
+        linea("Saldo inicial según banco", c.ini_banco) +
+        linea("Saldo inicial según mayor", c.ini_mayor) +
+        linea("Diferencia al inicio", c.dif_ini) +
+        linea(c.con_arrastre ? "Explicada por los pendientes del cierre del mes anterior"
+          : "Explicada por asientos que el banco registró el mes anterior", c.tot_mes_ant) +
+        linea("Diferencia inicial sin explicar", c.sin_explicar_ini, "total") +
+        `<tr class="titulo"><td colspan="2">Al cierre</td></tr>` +
+        linea("Saldo final según mayor", c.fin_mayor) +
+        linea("(+/−) Movimientos del banco sin contabilizar", c.tot_pend_banco) +
+        linea("(+/−) Gastos e impuestos del banco sin contabilizar", c.tot_gastos) +
+        linea("(−/+) Asientos del mayor que no están en el banco", -c.tot_pend_mayor) +
+        linea("(−/+) Diferencias de importe en partidas conciliadas", -c.difs) +
+        linea("Saldo del banco calculado", c.calculado, "total") +
+        linea("Saldo final según banco", c.fin_banco, "total") +
+        linea("Diferencia final (debe coincidir con la inicial sin explicar)", c.dif_final, "total");
+
+      document.getElementById("resumen").innerHTML = [
+        ["Asientos del mayor del mes", c.asientos_mayor],
+        ["Asientos del mayor conciliados", c.conciliados],
+        ["Asientos del mayor pendientes (incluye arrastrados)", c.pend_mayor],
+        ["Movimientos del banco pendientes, sin gastos (incluye arrastrados)", c.pend_banco],
+        ["Gastos e impuestos del banco pendientes", c.pend_gastos],
+        ["Propuestas sin revisar", c.propuestas],
+      ].map(([t, v]) => `<tr><td>${t}</td><td class="num">${v}</td></tr>`).join("");
+
+      const activos = d.cruces.filter((x) => x.estado === "conciliado");
+      const mesSiguiente = new Set(d.cruces.filter((x) => x.estado === "mes_siguiente").flatMap((x) => x.items));
+      const cruzados = new Set(activos.flatMap((x) => x.items));
+      const pend = d.movimientos.filter((m) => m.lado !== "A" && !cruzados.has(m.id) && Number(m.importe) !== 0);
+      const porFecha = (a, b) => a.fecha.localeCompare(b.fecha) || a.orden - b.orden;
+      const suma = (lista) => lista.reduce((s, m) => s + Math.round(Number(m.importe) * 100), 0) / 100;
+
+      const pendMayor = pend.filter(esMayor).sort(porFecha);
+      document.getElementById("pendMayor").innerHTML = tabla(
+        [{ titulo: "Fecha" }, { titulo: "Concepto" }, { titulo: "Asiento" }, { titulo: "Importe", num: true }],
+        pendMayor.map((m) => [fechaCorta(m.fecha), conObs(m), esc(m.nro || ""), importe(m.importe)]),
+        suma(pendMayor));
+
+      const pendBanco = pend.filter((m) => !esMayor(m) && !m.rubro_gasto).sort(porFecha);
+      document.getElementById("pendBanco").innerHTML = tabla(
+        [{ titulo: "Fecha" }, { titulo: "Concepto" }, { titulo: "Detalle" }, { titulo: "Importe", num: true }],
+        pendBanco.map((m) => [fechaCorta(m.fecha), conObs(m), esc(m.detalle || ""), importe(m.importe)]),
+        suma(pendBanco));
+
+      const rubros = new Map();
+      for (const m of pend.filter((m) => !esMayor(m) && m.rubro_gasto)) {
+        const r = rubros.get(m.rubro_gasto) || { cantidad: 0, total: 0 };
+        r.cantidad++;
+        r.total += Math.round(Number(m.importe) * 100);
+        rubros.set(m.rubro_gasto, r);
+      }
+      document.getElementById("gastos").innerHTML = tabla(
+        [{ titulo: "Rubro" }, { titulo: "Cantidad", num: true }, { titulo: "Importe", num: true }],
+        [...rubros].map(([rubro, r]) => [esc(rubro), r.cantidad, importe(r.total / 100)]),
+        c.tot_gastos);
+
+      const porId = new Map(d.movimientos.map((m) => [m.id, m]));
+      const descripcion = (x) => {
+        const items = x.items.map((id) => porId.get(id)).filter(Boolean);
+        return items.map((m) => `${esMayor(m) ? "Mayor" : "Banco"} ${fechaCorta(m.fecha)} ${esc(m.concepto)} ${importe(m.importe)}`).join("<br>");
+      };
+      const conDiferencia = activos.filter((x) => Math.abs(Number(x.diferencia)) >= 0.005);
+      document.getElementById("diferencias").innerHTML = tabla(
+        [{ titulo: "N°" }, { titulo: "Regla" }, { titulo: "Movimientos" }, { titulo: "Diferencia", num: true }],
+        conDiferencia.map((x) => [x.numero, esc(x.regla) + (x.nota ? `<br><small>${esc(x.nota)}</small>` : ""),
+          descripcion(x), importe(x.diferencia)]));
+
+      const manuales = d.cruces.filter((x) => x.origen === "manual" || x.resuelto_por_nombre);
+      document.getElementById("manuales").innerHTML = tabla(
+        [{ titulo: "N°" }, { titulo: "Qué" }, { titulo: "Movimientos" }, { titulo: "Quién" }],
+        manuales.map((x) => [x.numero,
+          x.estado === "mes_siguiente" ? "Se registra el mes siguiente" : x.origen === "manual" ? "Conciliado a mano" : x.estado === "rechazado" ? `Rechazado (${esc(x.regla)})` : `Aceptado (${esc(x.regla)})`,
+          descripcion(x),
+          esc(x.origen === "manual" ? `${x.creado_por_nombre || ""}, ${new Date(x.fecha_creacion).toLocaleDateString("es-AR")}`
+            : `${x.resuelto_por_nombre}, ${new Date(x.fecha_resuelto).toLocaleDateString("es-AR")}`)]));
+
+      document.getElementById("pie").textContent =
+        `Impreso el ${new Date().toLocaleString("es-AR")}. Archivos leídos: ` +
+        d.archivos.map((a) => a.ruta).join(", ") + ".";
+      document.getElementById("informe").hidden = false;
+    }
+
+    cargar();
+  </script>
+</body>
+</html>

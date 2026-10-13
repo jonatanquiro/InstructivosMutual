@@ -36,6 +36,21 @@
       </div>
     </div>
 
+    <!-- Sólo administradores: ajustes que valen para todos los usuarios -->
+    <div class="caja-config" id="cajaAdmin" hidden>
+      <div class="fila-config">
+        <div class="fila-config-texto">
+          <strong>Chat interno (para todos)</strong>
+          <span id="textoChat">Cuando está apagado, nadie ve el chat ni la barra de mensajes.</span>
+        </div>
+        <div class="selector-tema">
+          <button type="button" id="btnChatSi" data-chat="si">Activado</button>
+          <button type="button" id="btnChatNo" data-chat="no">Apagado</button>
+        </div>
+      </div>
+      <span id="mensajeAdmin" class="perfil-mensaje" hidden></span>
+    </div>
+
     <div class="caja-config caja-config-perfil">
       <strong class="caja-config-titulo">Datos personales</strong>
 
@@ -186,6 +201,48 @@
     });
 
     cargarConfiguracion();
+
+    // --- Ajustes generales (sólo admin): chat activado o apagado para todos
+    const btnChatSi = document.getElementById("btnChatSi");
+    const btnChatNo = document.getElementById("btnChatNo");
+    const mensajeAdmin = document.getElementById("mensajeAdmin");
+
+    function marcarChat(activo) {
+      btnChatSi.classList.toggle("activo", activo);
+      btnChatNo.classList.toggle("activo", !activo);
+    }
+
+    async function cargarAjustesAdmin() {
+      try {
+        const yo = await (await fetch("/api/auth/me")).json();
+        if (yo.rol !== "admin") return;
+        const ajustes = await (await fetch("/api/ajustes")).json();
+        marcarChat(ajustes.chatActivo);
+        document.getElementById("cajaAdmin").hidden = false;
+      } catch (error) {
+        // Sin acceso o sin conexión: la sección queda oculta.
+      }
+    }
+
+    async function cambiarChat(activo) {
+      const respuesta = await fetch("/api/ajustes", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ chatActivo: activo }),
+      });
+      const datos = await respuesta.json().catch(() => ({}));
+      mensajeAdmin.textContent = respuesta.ok
+        ? (activo ? "Chat activado para todos." : "Chat apagado para todos.")
+        : datos.error || "No se pudo guardar";
+      mensajeAdmin.classList.toggle("error", !respuesta.ok);
+      mensajeAdmin.hidden = false;
+      setTimeout(() => (mensajeAdmin.hidden = true), 3000);
+      if (respuesta.ok) marcarChat(activo);
+    }
+
+    btnChatSi.addEventListener("click", () => cambiarChat(true));
+    btnChatNo.addEventListener("click", () => cambiarChat(false));
+    cargarAjustesAdmin();
   </script>
 </body>
 </html>

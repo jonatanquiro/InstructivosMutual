@@ -8,7 +8,7 @@
 > Para una descripción de qué hace la app desde el punto de vista de un usuario, ver
 > [funcionamiento-general.md](./funcionamiento-general.md).
 >
-> Última actualización: 2026-09-18.
+> Última actualización: 2026-10-09.
 
 ## Stack y arranque
 
@@ -112,7 +112,14 @@ Todos se registran en `server.js` bajo `/api` (ver más arriba el detalle de pro
   viaja en la sesión — usado por el frontend para el saludo con avatar y para mostrar/ocultar
   secciones de admin).
 - **chat.routes.js** (`requiereLogin`): ver detalle completo más abajo, es el módulo más
-  grande e intrincado.
+  grande e intrincado. **Se puede apagar para todos** (ajuste `chat_activo`, ver
+  `ajustes.routes.js`): apagado, `server.js` corta `/api/chat/*`, `/chat.html` y
+  `/uploads/chat` (`requiereChatActivo`), `socket.js` rechaza conexiones, `comun.js` no carga
+  la barra flotante y el menú oculta la tarjeta. Arranca apagado.
+- **ajustes.routes.js** (`/api/ajustes`, `requiereLogin`): `GET` devuelve los ajustes
+  generales (`{ chatActivo }`) a cualquier logueado; `PUT` los cambia (sólo admin, desde
+  `configuracion.html`). Lee/escribe `app_ajustes` vía `config/ajustes.js` (caché de 5 s; si la
+  tabla no existe, usa los valores por defecto: chat apagado).
 - **config.routes.js** (`requiereLogin`): tema y perfil personal, todo contra
   `app_config_usuario` (upsert vía `MERGE` en cada endpoint). `GET /config` trae todo junto
   (tema + telefono + email + fechaNacimiento + fotoUrl). `PUT /config` guarda solo el tema (se
@@ -218,6 +225,71 @@ Facebook viejo), en vez del parpadeo que había antes. Se recalcula cada vez que
 lista de conversaciones (por sondeo o por los eventos de socket de arriba), así que también
 funciona con la pestaña de fondo. En el resto de las páginas, el mismo comportamiento (título +
 beep + badges) lo maneja `chat-flotante.js` — ver detalle en `src/public/` más abajo.
+
+## Conciliación bancaria
+
+Mayor contable de cada cuenta banco (PDF del sistema en FoxPro) contra el resumen del banco
+(PDF). El motor que lee los PDF y cruza es Python; Node se ocupa de pantallas, permisos y SQL.
+
+- **motor/** (Python 3 + `pdfplumber` + `openpyxl`, ver `motor/requirements.txt`):
+  `lectores.py` (un lector por banco, verifica que los saldos impresos cierren y si no lanza
+  `ErrorLectura`) y `conciliar.py` (reglas de cruce y cuadre) vienen **tal cual** del prototipo:
+  no tocarlos sin correr la regresión (único cambio: `leer_santafe` lee todos los resúmenes que
+  trae un mismo PDF, encadenados por saldo). `extracto.py` arma el **extracto continuo del año**
+  de cada banco: lee todos los resúmenes (con caché en `<carpeta>/_cache`, por hash del PDF y del
+  lector), los encadena por saldo y detecta huecos (falta un PDF). Para un mes, cada resumen se
+  queda con sus movimientos (el asiento global de gastos se arma por resumen), salvo lo fechado en
+  el mes siguiente, que pasa a ese mes (los del 01/09 al final del resumen de agosto).
+  `procesar.py` es el puente con Node: `conciliar`,
+  `archivos` (qué PDF hay por banco/mes) y `validar` (lee un PDF recién subido), todo con
+  salida JSON. `regresion.py --base docs/Bancos` controla septiembre 2026 contra los números
+  verificados del prototipo.
+- **src/config/motor.js**: ejecuta `procesar.py` como proceso aparte (`PYTHON_PATH`) y expone
+  la carpeta de PDF (`CONC_CARPETA_BANCOS`, por defecto `docs/Bancos`, ignorada por git).
+- **src/routes/conciliacion-datos.js**: toda la lógica de datos. Cola de lecturas (una a la
+  vez), guardado del resultado del motor, cuadre de saldos (misma cuenta que `cuadre()` del
+  motor, pero desde la base), conciliación manual, sugerencias, observaciones/revisado, cierre
+  y arrastre, consulta de socios.
+- **src/routes/conciliacion.routes.js** (`/api/conciliacion`, `requiereLogin` +
+  `requiereConciliacion`: admins o usuarios en `conc_permisos`): grilla, subida de PDF,
+  relectura, punteo, cruces, movimientos, cierre/reapertura, PDF.
+- **Pantallas** (pensadas para una persona no técnica, de a un banco por vez):
+  `conciliacion.html` (inicio: un mes, una tarjeta por banco con una frase de qué sigue),
+  `conciliacion-banco.html` (tres pasos: 1 Papeles —subir mayor y resumen, ver qué se leyó—,
+  2 Conciliar —propuestas, sin par, gastos aparte, mes siguiente, conciliados—, 3 Cerrar el mes),
+  `conciliacion-punteo.html` (vista secundaria "todo junto, como en papel"),
+  `conciliacion-informe.html` (para imprimir), `conciliacion-comun.js` (helpers compartidos).
+- **Nada se concilia solo**: el motor arma *propuestas* (`estado = 'a_confirmar'`) y sólo cuenta
+  como conciliado lo que la contadora acepta o hace a mano. El botón "Conciliar las exactas"
+  (mismo importe, hasta 2 días hábiles sin contar sábados ni domingos) lo aprieta ella. Leer los
+  PDF tampoco es automático al subirlos: se hace con "Leer y comparar".
+- **"Se registra el mes siguiente"**: cruce de un solo movimiento con `estado = 'mes_siguiente'`
+  (ej. banco del 30/09 que se asienta el 01/10). No cuenta como conciliado: sigue pendiente en el
+  cuadre y pasa al mes siguiente al cerrar, pero sale de la lista de cosas para revisar.
+- **Tablas** (`sql/agregar_conciliacion.sql`, prefijo `conc_`): `conc_bancos`,
+  `conc_permisos`, `conc_periodos` (banco + mes), `conc_archivos`, `conc_movimientos`,
+  `conc_cruces` + `conc_cruce_items`, `conc_observaciones`, `conc_revisados`.
+
+Detalles que no son obvios:
+
+- **Lados de `conc_movimientos`**: `M` mayor, `B` banco del mes, `A` banco del mes anterior
+  (sólo los que usó la regla "mes anterior" del motor), `R`/`Q` pendientes arrastrados del mes
+  anterior cerrado (del mayor / del banco), `X` ya no está en el PDF (se conserva por historia).
+- **Clave estable** (`lado|fecha|importe|concepto|n`): volver a leer los PDF hace un MERGE por
+  clave, así los ids no cambian y se conserva el trabajo manual. Los cruces tocados por una
+  persona se conservan si sus movimientos siguen; si no, se deshacen con una nota que el punteo
+  muestra. Los automáticos sin tocar se recalculan; uno que alguien deshizo o rechazó no vuelve.
+- **Nada se borra**: deshacer marca `deshecho`, rechazar pone `estado = 'rechazado'`.
+- **Propuestas**: todo lo que cruza el motor queda como propuesta (`estadoInicialCruce`),
+  también lo exacto; ver "Nada se concilia solo" más arriba.
+- **Cierre y arrastre**: se cierra en orden y sin cruces para confirmar. Al cerrar, los
+  pendientes se copian al mes siguiente como `R`/`Q` (clave = la original con otra primera
+  letra; la de `Q` coincide con su "gemelo" `A`, y los cruces del motor con un `A` pasan a usar
+  el `Q`). Con el mes anterior cerrado, la diferencia inicial se explica con lo arrastrado.
+  Reabrir (sólo admin) retira el arrastre del mes siguiente.
+- **Meses bloqueados**: anteriores a `CONC_PRIMER_PERIODO` (por defecto 09/2026).
+- **Socios**: CUIT del detalle del banco contra `[UNION].dbo.SOMAESGRAL.SONID` (sólo lectura);
+  "ex socio" si todos sus registros tienen `SOBSBAJA`.
 
 ## src/public/ — frontend (HTML + JS + CSS planos, sin build ni framework)
 
@@ -372,6 +444,8 @@ alguien los edita a mano salvo `export-bd.json` que lo genera `exportar-bd.js`).
   `app_config_usuario` para bases que ya tenían esa tabla solo con `tema`. **Hay que correrlo a
   mano una vez contra la base INFORMA real** antes de que la sección "Datos personales" de
   Configuración funcione ahí; en una base nueva alcanza con el `schema.sql` actualizado.
+- **agregar_ajustes.sql**: crea `app_ajustes` (ajustes generales clave/valor, ej. `chat_activo`)
+  con el chat apagado.
 - **agregar_indices_analitica.sql**: índices sobre `app_consultas_log` para el panel de
   estadísticas de preguntas.
 - **desplegar_servidor.sql**: script "maestro" para poner al día el servidor real de
@@ -390,6 +464,8 @@ alguien los edita a mano salvo `export-bd.json` que lo genera `exportar-bd.js`).
 - `SESSION_SECRET`: secreto para firmar la cookie de sesión.
 - `CHAT_CLAVE_CIFRADO`: clave hex de 32 bytes para AES-256-GCM del chat — **no cambiar una vez
   que hay mensajes guardados**, quedarían ilegibles.
+- `CONC_CARPETA_BANCOS`, `CONC_PRIMER_PERIODO`, `PYTHON_PATH` (opcionales): conciliación bancaria,
+  ver la sección de arriba.
 - `SESSION_COOKIE_NAME` / `CHAT_UPLOADS_DIR` / `PERFIL_UPLOADS_DIR` (opcionales, los dos
   últimos usados en `.env.test`): permiten correr una instancia de testeo en paralelo a
   producción sin pisar sesiones ni archivos subidos.

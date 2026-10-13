@@ -8,7 +8,7 @@ const http = require("http");
 const express = require("express");
 const session = require("express-session");
 
-const { requiereLogin, requiereAdmin } = require("./middleware/auth");
+const { requiereLogin, requiereAdmin, requiereConciliacion, requiereChatActivo } = require("./middleware/auth");
 const { inicializar: inicializarSocket } = require("./config/socket");
 const authRoutes = require("./routes/auth.routes");
 const faqRoutes = require("./routes/faq.routes");
@@ -19,6 +19,8 @@ const usuariosRoutes = require("./routes/usuarios.routes");
 const configRoutes = require("./routes/config.routes");
 const bcraRoutes = require("./routes/bcra.routes");
 const chatRoutes = require("./routes/chat.routes");
+const conciliacionRoutes = require("./routes/conciliacion.routes");
+const ajustesRoutes = require("./routes/ajustes.routes");
 
 const app = express();
 
@@ -57,7 +59,16 @@ app.use("/api", requiereLogin, faqRoutes);
 app.use("/api", requiereLogin, cumpleaniosRoutes);
 app.use("/api", requiereLogin, configRoutes);
 app.use("/api", requiereLogin, bcraRoutes);
+// Ajustes generales (chat habilitado o no): leerlos cualquiera, cambiarlos sólo admin.
+app.use("/api/ajustes", requiereLogin, ajustesRoutes);
+// El chat se puede apagar para todos (Configuración, admin). Las rutas del
+// chat están todas bajo /api/chat/..., así que el control va con ese prefijo
+// y no corta requests de otros routers montados en "/api".
+app.use("/api/chat", requiereLogin, requiereChatActivo);
 app.use("/api", requiereLogin, chatRoutes);
+// Con prefijo propio: adentro aplica requiereConciliacion a casi todo, y
+// montado en "/api" a secas cortaría requests de los routers de abajo.
+app.use("/api/conciliacion", requiereLogin, conciliacionRoutes);
 app.use("/api", requiereLogin, requiereAdmin, usuariosRoutes);
 app.use("/api", requiereLogin, requiereAdmin, faqAdminRoutes);
 app.use("/api", requiereLogin, requiereAdmin, estadisticasRoutes);
@@ -79,7 +90,7 @@ function resolverCarpetaUploads(variableEntorno, porDefecto) {
 // la instancia de testeo use una carpeta separada de la de producción.
 const CARPETA_UPLOADS_CHAT = resolverCarpetaUploads("CHAT_UPLOADS_DIR", "uploads/chat");
 fs.mkdirSync(CARPETA_UPLOADS_CHAT, { recursive: true });
-app.use("/uploads/chat", requiereLogin, express.static(CARPETA_UPLOADS_CHAT));
+app.use("/uploads/chat", requiereLogin, requiereChatActivo, express.static(CARPETA_UPLOADS_CHAT));
 
 // Fotos de perfil: mismo criterio que las del chat (no son públicas).
 const CARPETA_UPLOADS_PERFILES = resolverCarpetaUploads("PERFIL_UPLOADS_DIR", "uploads/perfiles");
@@ -100,6 +111,18 @@ app.get("/faq-admin.html", requiereLogin, requiereAdmin, (req, res) => {
 app.get("/proyectos.html", requiereLogin, requiereAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "proyectos.html"));
 });
+
+// El chat completo, sólo si está habilitado (si no, vuelve al menú).
+app.get("/chat.html", requiereLogin, requiereChatActivo, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "chat.html"));
+});
+
+// Conciliación bancaria: sólo admins y usuarias habilitadas en conc_permisos.
+for (const pagina of ["conciliacion.html", "conciliacion-banco.html", "conciliacion-punteo.html", "conciliacion-informe.html"]) {
+  app.get(`/${pagina}`, requiereLogin, requiereConciliacion, (req, res) => {
+    res.sendFile(path.join(__dirname, "public", pagina));
+  });
+}
 
 // Archivos estáticos (HTML/CSS/JS del frontend). "index: false" es clave:
 // sin esto, Express serviría public/index.html automáticamente en "/"

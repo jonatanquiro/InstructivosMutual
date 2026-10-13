@@ -4,3 +4,8 @@ node_modules/
 tmp/
 Thumbs.db
 src/uploads/
+
+# PDF reales de mayores y resúmenes bancarios (conciliación): nunca a git
+docs/Bancos/
+__pycache__/
+docs/Bancos_respaldo*/
