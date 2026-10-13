@@ -16,7 +16,35 @@ const CARPETA_BANCOS = path.isAbsolute(CARPETA_CONFIGURADA)
   ? CARPETA_CONFIGURADA
   : path.join(RAIZ, CARPETA_CONFIGURADA);
 
-class ErrorMotor extends Error {}
+// "delServidor": el problema no es el PDF sino la instalación (falta Python o
+// alguna librería). Quien llama lo usa para no decirle a la contadora que
+// revise el archivo cuando no tiene nada que ver.
+class ErrorMotor extends Error {
+  constructor(mensaje, delServidor = false) {
+    super(mensaje);
+    this.delServidor = delServidor;
+  }
+}
+
+const COMO_ARREGLAR = "En el servidor, corré actualizar-servidor.bat (instala lo que falta) y reiniciá el servidor.";
+
+// Python terminó mal: se mira lo que escribió para decir qué pasó de verdad.
+function errorSegunSalida(codigo, errores) {
+  const texto = String(errores || "");
+  const modulo = /No module named '?([\w.]+)'?/.exec(texto);
+  if (modulo) {
+    return new ErrorMotor(`Al servidor le falta la librería de Python «${modulo[1]}», que se usa para leer los PDF. ${COMO_ARREGLAR}`, true);
+  }
+  // 9009 = "no se reconoce como un comando"; el otro texto es el aviso del
+  // acceso directo de la Tienda de Windows cuando Python no está instalado.
+  if (codigo === 9009 || /Python was not found|no se encontr[oó] Python|Microsoft Store/i.test(texto)) {
+    return new ErrorMotor("Python no está instalado en el servidor (o no está en el PATH), y hace falta para leer los PDF. " +
+      "Instalalo desde python.org tildando «Add python.exe to PATH». " + COMO_ARREGLAR, true);
+  }
+  const ultima = texto.trim().split(/\r?\n/).pop() || "";
+  return new ErrorMotor("El PDF no se pudo leer (no tiene el formato esperado)." +
+    (ultima ? ` Detalle técnico: ${ultima.slice(0, 200)}` : ""));
+}
 
 // Corre "python procesar.py <accion> --clave valor ..." y devuelve el JSON.
 // Si el lector detecta que la lectura no cierra, el JSON trae ok:false con el
@@ -41,13 +69,14 @@ function ejecutarMotor(accion, opciones, timeoutMs = 5 * 60 * 1000) {
     proceso.on("error", (error) => {
       clearTimeout(reloj);
       console.error("No se pudo ejecutar Python:", error);
-      reject(new ErrorMotor("No se pudo ejecutar el lector de PDF (¿está instalado Python en el servidor?)."));
+      reject(new ErrorMotor("No se pudo ejecutar Python en el servidor, y hace falta para leer los PDF. Instalalo desde " +
+        "python.org tildando «Add python.exe to PATH» (o indicá dónde está con PYTHON_PATH en el .env). " + COMO_ARREGLAR, true));
     });
     proceso.on("close", (codigo) => {
       clearTimeout(reloj);
       if (codigo !== 0) {
         console.error(`Motor de conciliación terminó con código ${codigo}:\n${errores}`);
-        return reject(new ErrorMotor("El PDF no se pudo leer (no tiene el formato esperado)."));
+        return reject(errorSegunSalida(codigo, errores));
       }
       try {
         resolve(JSON.parse(salida));

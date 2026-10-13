@@ -243,10 +243,12 @@ router.post("/archivo", (req, res, next) => {
       }, 2 * 60 * 1000);
     } catch (error) {
       if (!(error instanceof ErrorMotor)) throw error;
-      v = { ok: false, error: error.message };
+      v = { ok: false, error: error.message, delServidor: error.delServidor };
     }
     if (!v.ok) {
       borrarTemporal();
+      // Falta Python o una librería en el servidor: el PDF no tiene la culpa.
+      if (v.delServidor) return res.status(500).json({ error: v.error });
       return res.status(422).json({
         error: `No se pudo usar este PDF como ${queEs} de ${nombreBanco}. ${v.error} ` +
           "Revisá que sea el archivo correcto y que no esté cortado.",
