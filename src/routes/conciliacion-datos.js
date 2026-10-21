@@ -674,7 +674,7 @@ async function cerrarPeriodo(periodoId, usuarioId, permiso) {
 }
 
 async function reabrirPeriodo(periodoId, usuarioId, permiso) {
-  if (!permiso.esAdmin) throw new ErrorConciliacion("Sólo un administrador puede reabrir un mes.");
+  if (!permiso.puedeReabrir) throw new ErrorConciliacion("No tenés permiso para reabrir meses.");
   const pool = await getPool();
   const p = await datosPeriodo(() => pool.request(), periodoId);
   if (!p || p.estado !== "cerrado") throw new ErrorConciliacion("Ese mes no está cerrado.");

@@ -7,13 +7,27 @@ const router = express.Router();
 // Todas las rutas de este archivo ya pasaron por requiereLogin +
 // requiereAdmin en server.js, así que acá asumimos que quien llama es admin.
 
+// Nivel de permiso de conciliación, en un solo valor para la pantalla.
+// Se guarda en conc_permisos: sin fila = "no"; las otras, según las columnas.
+const NIVELES_CONCILIACION = {
+  no: null,
+  usa: { cerrar: false, reabrir: false },
+  cierra: { cerrar: true, reabrir: false },
+  total: { cerrar: true, reabrir: true },
+};
+
 router.get("/usuarios", async (req, res) => {
   try {
     const pool = await getPool();
     const resultado = await pool.request().query(`
-      SELECT id, nombre_usuario, nombre_completo, rol, activo, ultimo_login
-      FROM app_usuarios
-      ORDER BY nombre_completo
+      SELECT u.id, u.nombre_usuario, u.nombre_completo, u.rol, u.activo, u.ultimo_login,
+             CASE WHEN p.usuario_id IS NULL THEN 'no'
+                  WHEN p.puede_reabrir = 1 THEN 'total'
+                  WHEN p.puede_cerrar = 1 THEN 'cierra'
+                  ELSE 'usa' END AS conciliacion
+      FROM app_usuarios u
+      LEFT JOIN conc_permisos p ON p.usuario_id = u.id
+      ORDER BY u.nombre_completo
     `);
     res.json(resultado.recordset);
   } catch (error) {
@@ -62,11 +76,15 @@ router.post("/usuarios", async (req, res) => {
 });
 
 router.put("/usuarios/:id", async (req, res) => {
-  const { nombreCompleto, rol, activo } = req.body;
+  const { nombreCompleto, rol, activo, conciliacion } = req.body;
   const id = Number(req.params.id);
 
   if (!nombreCompleto || !rol || typeof activo !== "boolean") {
     return res.status(400).json({ error: "Faltan datos obligatorios" });
+  }
+  // conciliacion es opcional: si no viene, el permiso queda como estaba.
+  if (conciliacion !== undefined && !(conciliacion in NIVELES_CONCILIACION)) {
+    return res.status(400).json({ error: "Permiso de conciliación inválido" });
   }
 
   // Evita que un admin se desactive a sí mismo y se quede afuera sin querer.
@@ -87,6 +105,23 @@ router.put("/usuarios/:id", async (req, res) => {
         SET nombre_completo = @nombreCompleto, rol = @rol, activo = @activo
         WHERE id = @id
       `);
+
+    if (conciliacion !== undefined) {
+      const nivel = NIVELES_CONCILIACION[conciliacion];
+      const pedido = pool.request().input("id", sql.Int, id);
+      if (!nivel) {
+        await pedido.query("DELETE FROM conc_permisos WHERE usuario_id = @id");
+      } else {
+        await pedido
+          .input("cerrar", sql.Bit, nivel.cerrar)
+          .input("reabrir", sql.Bit, nivel.reabrir)
+          .query(`
+            UPDATE conc_permisos SET puede_cerrar = @cerrar, puede_reabrir = @reabrir WHERE usuario_id = @id;
+            IF @@ROWCOUNT = 0
+              INSERT INTO conc_permisos (usuario_id, puede_cerrar, puede_reabrir) VALUES (@id, @cerrar, @reabrir);
+          `);
+      }
+    }
     res.json({ ok: true });
   } catch (error) {
     console.error("Error actualizando usuario:", error);

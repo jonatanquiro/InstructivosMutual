@@ -16,8 +16,10 @@ async function main() {
   const pool = await getPool();
 
   // Reinicio limpio. app_consultas_log tiene FK a app_preguntas, así que
-  // se borra primero (si no, SQL Server no deja borrar app_preguntas).
+  // se borra primero (si no, SQL Server no deja borrar app_preguntas). Las
+  // opciones anidadas tienen FK a su padre: se sueltan antes de borrar.
   await pool.request().query("DELETE FROM app_consultas_log");
+  await pool.request().query("UPDATE app_preguntas SET padre_id = NULL");
   await pool.request().query("DELETE FROM app_preguntas");
   await pool.request().query("DELETE FROM app_modulos");
   // Reseteamos los contadores de IDENTITY para que arranque de 1 de nuevo.
@@ -40,22 +42,33 @@ async function main() {
       `);
     const moduloId = resultadoModulo.recordset[0].id;
 
-    for (let j = 0; j < modulo.preguntas.length; j++) {
-      const pregunta = modulo.preguntas[j];
-      await pool
-        .request()
-        .input("moduloId", sql.Int, moduloId)
-        .input("pregunta", sql.NVarChar, pregunta.pregunta)
-        .input("respuesta", sql.NVarChar(sql.MAX), pregunta.respuesta)
-        .input("orden", sql.Int, j)
-        .query(`
-          INSERT INTO app_preguntas (modulo_id, pregunta, respuesta, orden)
-          VALUES (@moduloId, @pregunta, @respuesta, @orden)
-        `);
-      totalPreguntas += 1;
+    // Preguntas anidadas: una pregunta puede traer "opciones" (mismo formato
+    // pregunta/respuesta, y a su vez con sus propias "opciones"); se cargan
+    // con padre_id apuntando a la pregunta que las contiene.
+    async function insertarPreguntas(preguntas, padreId) {
+      for (let j = 0; j < preguntas.length; j++) {
+        const pregunta = preguntas[j];
+        const resultadoPregunta = await pool
+          .request()
+          .input("moduloId", sql.Int, moduloId)
+          .input("padreId", sql.Int, padreId)
+          .input("pregunta", sql.NVarChar, pregunta.pregunta)
+          .input("respuesta", sql.NVarChar(sql.MAX), pregunta.respuesta)
+          .input("orden", sql.Int, j)
+          .query(`
+            INSERT INTO app_preguntas (modulo_id, padre_id, pregunta, respuesta, orden)
+            OUTPUT INSERTED.id
+            VALUES (@moduloId, @padreId, @pregunta, @respuesta, @orden)
+          `);
+        totalPreguntas += 1;
+        if (pregunta.opciones) {
+          await insertarPreguntas(pregunta.opciones, resultadoPregunta.recordset[0].id);
+        }
+      }
     }
+    await insertarPreguntas(modulo.preguntas, null);
 
-    console.log(`  Módulo "${modulo.nombre}": ${modulo.preguntas.length} preguntas`);
+    console.log(`  Módulo "${modulo.nombre}": ${modulo.preguntas.length} preguntas principales`);
   }
 
   console.log(`\nListo: ${modulos.length} módulos, ${totalPreguntas} preguntas cargadas.`);

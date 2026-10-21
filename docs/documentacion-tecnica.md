@@ -143,7 +143,9 @@ Todos se registran en `server.js` bajo `/api` (ver más arriba el detalle de pro
   preguntas activas anidadas, alimenta la pantalla de preguntas frecuentes), `POST
   /preguntas/:id/consulta` (loguea en `app_consultas_log` que alguien vio esa respuesta).
 - **faq-admin.routes.js** (`requiereLogin + requiereAdmin`): CRUD de `app_modulos` y
-  `app_preguntas` (sin DELETE — se desactivan con el flag `activo`), más endpoints de
+  `app_preguntas` (sin DELETE — se desactivan con el flag `activo`; `padreId` opcional para
+  preguntas anidadas: la hija toma siempre el módulo del padre, se rechazan ciclos, y al cambiar
+  de módulo una pregunta se mudan sus descendientes), más endpoints de
   estadísticas de uso (`/estadisticas/resumen`, `/estadisticas/top-preguntas`,
   `/estadisticas/por-modulo`, `/estadisticas/sin-consultas`) leyendo `app_consultas_log`.
 - **estadisticas.routes.js** (`requiereLogin + requiereAdmin`, usa `db-dw.js`): un endpoint por
@@ -251,7 +253,7 @@ Mayor contable de cada cuenta banco (PDF del sistema en FoxPro) contra el resume
   motor, pero desde la base), conciliación manual, sugerencias, observaciones/revisado, cierre
   y arrastre, consulta de socios.
 - **src/routes/conciliacion.routes.js** (`/api/conciliacion`, `requiereLogin` +
-  `requiereConciliacion`: admins o usuarios en `conc_permisos`): grilla, subida de PDF,
+  `requiereConciliacion`: sólo usuarios en `conc_permisos`, sin importar el rol): grilla, subida de PDF,
   relectura, punteo, cruces, movimientos, cierre/reapertura, PDF.
 - **Pantallas** (pensadas para una persona no técnica, de a un banco por vez):
   `conciliacion.html` (inicio: un mes, una tarjeta por banco con una frase de qué sigue),
@@ -267,7 +269,8 @@ Mayor contable de cada cuenta banco (PDF del sistema en FoxPro) contra el resume
   (ej. banco del 30/09 que se asienta el 01/10). No cuenta como conciliado: sigue pendiente en el
   cuadre y pasa al mes siguiente al cerrar, pero sale de la lista de cosas para revisar.
 - **Tablas** (`sql/agregar_conciliacion.sql`, prefijo `conc_`): `conc_bancos`,
-  `conc_permisos`, `conc_periodos` (banco + mes), `conc_archivos`, `conc_movimientos`,
+  `conc_permisos` (acceso + `puede_cerrar` + `puede_reabrir`, se edita desde Gestión de
+  Usuarios), `conc_periodos` (banco + mes), `conc_archivos`, `conc_movimientos`,
   `conc_cruces` + `conc_cruce_items`, `conc_observaciones`, `conc_revisados`.
 
 Detalles que no son obvios:
@@ -310,6 +313,9 @@ Detalles que no son obvios:
   no tiene lógica propia de chat.
 - **preguntas.html**: pantalla de preguntas frecuentes (árbol de opciones, no IA) — módulos vía
   `GET /api/modulos`, registra cada consulta vista con `POST /api/preguntas/:id/consulta`.
+  Soporta preguntas anidadas: si una pregunta trae `hijas`, su respuesta se muestra como
+  sub-pregunta y las hijas como botones (cualquier profundidad; ej. "Cambio de toner" → "¿Qué
+  impresora tenés?" → una opción por impresora).
 - **chat.html**: chat interno completo (ver detalle en `chat.routes.js` de arriba). En celular
   usa vista "estilo WhatsApp" (una pantalla a la vez: lista o conversación, con botón de
   volver) mediante la clase `chat-conversacion-abierta` en `.chat-app`, controlada
@@ -444,6 +450,12 @@ alguien los edita a mano salvo `export-bd.json` que lo genera `exportar-bd.js`).
   `app_config_usuario` para bases que ya tenían esa tabla solo con `tema`. **Hay que correrlo a
   mano una vez contra la base INFORMA real** antes de que la sección "Datos personales" de
   Configuración funcione ahí; en una base nueva alcanza con el `schema.sql` actualizado.
+- **agregar_preguntas_anidadas.sql**: agrega (idempotente) `app_preguntas.padre_id` (FK a la
+  misma tabla) para preguntas anidadas. **Hay que correrlo a mano una vez contra la base INFORMA
+  real** antes de desplegar el código nuevo: sin esa columna, `GET /api/modulos` y el admin de
+  preguntas fallan.
+- **cargar_toner_sistemas.sql**: carga (idempotente) en el módulo "Sistemas" la pregunta anidada
+  "Cambio de toner" con una opción por impresora. Requiere el script anterior.
 - **agregar_ajustes.sql**: crea `app_ajustes` (ajustes generales clave/valor, ej. `chat_activo`)
   con el chat apagado.
 - **agregar_indices_analitica.sql**: índices sobre `app_consultas_log` para el panel de

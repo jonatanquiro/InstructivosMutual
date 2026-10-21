@@ -10,7 +10,7 @@ router.get("/modulos", async (req, res) => {
     const pool = await getPool();
     const resultado = await pool.request().query(`
       SELECT m.id AS modulo_id, m.nombre AS modulo_nombre, m.orden AS modulo_orden,
-             p.id AS pregunta_id, p.pregunta, p.respuesta, p.orden AS pregunta_orden
+             p.id AS pregunta_id, p.padre_id, p.pregunta, p.respuesta, p.orden AS pregunta_orden
       FROM app_modulos m
       LEFT JOIN app_preguntas p ON p.modulo_id = m.id AND p.activo = 1
       WHERE m.activo = 1
@@ -18,8 +18,11 @@ router.get("/modulos", async (req, res) => {
     `);
 
     // Agrupamos las filas planas (join) en la estructura anidada que
-    // espera el frontend: [{ id, nombre, preguntas: [...] }, ...]
+    // espera el frontend: [{ id, nombre, preguntas: [{ ..., hijas: [...] }] }, ...]
+    // Las preguntas con padre_id van dentro de "hijas" de su padre (y así
+    // en cadena); si el padre está inactivo, la hija tampoco se muestra.
     const modulosPorId = new Map();
+    const preguntasPorId = new Map();
     for (const fila of resultado.recordset) {
       if (!modulosPorId.has(fila.modulo_id)) {
         modulosPorId.set(fila.modulo_id, {
@@ -29,11 +32,23 @@ router.get("/modulos", async (req, res) => {
         });
       }
       if (fila.pregunta_id) {
-        modulosPorId.get(fila.modulo_id).preguntas.push({
+        preguntasPorId.set(fila.pregunta_id, {
           id: fila.pregunta_id,
+          moduloId: fila.modulo_id,
+          padreId: fila.padre_id,
           pregunta: fila.pregunta,
           respuesta: fila.respuesta,
+          hijas: [],
         });
+      }
+    }
+
+    for (const pregunta of preguntasPorId.values()) {
+      const { moduloId, padreId, ...datos } = pregunta;
+      if (!padreId) {
+        modulosPorId.get(moduloId).preguntas.push(datos);
+      } else if (preguntasPorId.has(padreId)) {
+        preguntasPorId.get(padreId).hijas.push(datos);
       }
     }
 

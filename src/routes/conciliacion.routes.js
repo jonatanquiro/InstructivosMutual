@@ -39,7 +39,7 @@ router.get("/acceso", async (req, res) => {
     res.json(await permisoConciliacion(req));
   } catch (error) {
     console.error("Error consultando acceso a conciliación:", error);
-    res.json({ acceso: false, puedeCerrar: false, esAdmin: false });
+    res.json({ acceso: false, puedeCerrar: false, puedeReabrir: false });
   }
 });
 
@@ -425,7 +425,7 @@ router.post("/cruces/:id/:accion", async (req, res) => {
   }
 });
 
-// Cerrar el mes (pasa los pendientes al mes siguiente) y reabrirlo (sólo admin).
+// Cerrar el mes (pasa los pendientes al mes siguiente) y reabrirlo (cada uno con su permiso).
 router.post("/periodos/:id/:accion", async (req, res, next) => {
   if (!["cerrar", "reabrir"].includes(req.params.accion)) return next(); // p. ej. /cruces, más abajo
   const id = Number(req.params.id);

@@ -57,6 +57,14 @@
 
   <script src="/comun.js"></script>
   <script>
+    // Mismos valores que NIVELES_CONCILIACION en usuarios.routes.js.
+    const NIVELES_CONCILIACION = {
+      no: "Sin acceso",
+      usa: "Usa",
+      cierra: "Usa y cierra meses",
+      total: "Cierra y reabre meses",
+    };
+
     async function cargarUsuarios() {
       const contenedor = document.getElementById("listaUsuarios");
       const respuesta = await fetch("/api/usuarios");
@@ -87,6 +95,7 @@
             <th>Nombre completo</th>
             <th>Rol</th>
             <th>Activo</th>
+            <th>Conciliación</th>
             <th>Último login</th>
             <th>Acciones</th>
           </tr>
@@ -113,6 +122,12 @@
             </select>
           </td>
           <td><input type="checkbox" class="input-activo" ${usuario.activo ? "checked" : ""} /></td>
+          <td>
+            <select class="input-conciliacion">
+              ${Object.entries(NIVELES_CONCILIACION).map(([valor, texto]) =>
+                `<option value="${valor}" ${usuario.conciliacion === valor ? "selected" : ""}>${texto}</option>`).join("")}
+            </select>
+          </td>
           <td>${ultimoLogin}</td>
           <td class="acciones-usuario">
             <button class="btn-chico btn-guardar">Guardar</button>
@@ -133,11 +148,12 @@
       const nombreCompleto = fila.querySelector(".input-nombre").value.trim();
       const rol = fila.querySelector(".input-rol").value;
       const activo = fila.querySelector(".input-activo").checked;
+      const conciliacion = fila.querySelector(".input-conciliacion").value;
 
       const respuesta = await fetch(`/api/usuarios/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ nombreCompleto, rol, activo }),
+        body: JSON.stringify({ nombreCompleto, rol, activo, conciliacion }),
       });
       const datos = await respuesta.json();
 

@@ -104,4 +104,33 @@ router.get("/bcra/deudas/:cuit", async (req, res) => {
   }
 });
 
+// Sólo la razón social de un CUIT/CUIL (la usa la conciliación para ponerle
+// nombre a los que no son socios). Se guarda en memoria para no volver a
+// preguntarle al BCRA por el mismo CUIT cada vez que se abre un período.
+// null = el BCRA no lo tiene registrado. Los errores de conexión no se guardan.
+const nombresBcra = new Map();
+
+router.get("/bcra/nombre/:cuit", async (req, res) => {
+  const cuit = limpiarCuit(req.params.cuit);
+
+  if (cuit.length !== 11) {
+    return res.status(400).json({ error: "El CUIT/CUIL debe tener 11 dígitos" });
+  }
+
+  if (nombresBcra.has(cuit)) {
+    return res.json({ denominacion: nombresBcra.get(cuit) });
+  }
+
+  try {
+    // Si no tiene deudas este mes puede tenerlas en el historial (24 meses).
+    const datos = (await consultarBcra("Deudas", cuit)) || (await consultarBcra("Deudas/Historicas", cuit));
+    const denominacion = datos?.denominacion?.trim() || null;
+    nombresBcra.set(cuit, denominacion);
+    res.json({ denominacion });
+  } catch (error) {
+    console.error("Error consultando nombre en el BCRA:", error.message);
+    res.status(502).json({ error: "No se pudo conectar con el servicio del BCRA" });
+  }
+});
+
 module.exports = router;

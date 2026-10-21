@@ -111,7 +111,7 @@
       })
       .catch(() => {});
 
-    // Conciliación: admins y usuarias habilitadas en conc_permisos.
+    // Conciliación: sólo usuarios habilitados en conc_permisos (no depende del rol).
     fetch("/api/conciliacion/acceso")
       .then((r) => (r.ok ? r.json() : null))
       .then((permiso) => {

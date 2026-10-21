@@ -67,10 +67,18 @@
           <div class="error" id="errorNuevaPregunta"></div>
           <label for="nuevaPreguntaModulo">Módulo</label>
           <select id="nuevaPreguntaModulo" required></select>
+          <label for="nuevaPreguntaPadre">Es una opción de (opcional)</label>
+          <select id="nuevaPreguntaPadre"></select>
           <label for="nuevaPreguntaTexto">Pregunta</label>
           <input type="text" id="nuevaPreguntaTexto" required autocomplete="off" />
           <label for="nuevaPreguntaRespuesta">Respuesta</label>
           <textarea id="nuevaPreguntaRespuesta" rows="4" required></textarea>
+          <p class="ayuda-pregunta-anidada">
+            Preguntas anidadas: si una pregunta va a tener opciones (ej: "Cambio de toner"), en su
+            respuesta poné lo que el chat tiene que preguntar (ej: "¿Qué impresora tenés?"). Después
+            creá cada opción (ej: "Brother 1212") eligiéndola en "Es una opción de", con la respuesta
+            final (ej: el toner que le va).
+          </p>
           <button type="submit">Crear pregunta</button>
         </form>
       </div>
@@ -244,7 +252,52 @@
     async function cargarPreguntasAdmin() {
       preguntasCache = await pedirJson("/api/faq-admin/preguntas");
       pintarPreguntasAdmin(preguntasCache);
+      llenarSelectPadre();
     }
+
+    // "Cambio de toner › Brother 1212": la cadena de padres de una pregunta
+    // anidada, para reconocerla en las listas y en el selector de padre.
+    function rutaPregunta(pregunta) {
+      const partes = [pregunta.pregunta];
+      let actual = pregunta;
+      const vistos = new Set([actual.id]);
+      while (actual.padre_id) {
+        actual = preguntasCache.find((p) => p.id === actual.padre_id);
+        if (!actual || vistos.has(actual.id)) break;
+        vistos.add(actual.id);
+        partes.unshift(actual.pregunta);
+      }
+      return partes.join(" › ");
+    }
+
+    function opcionesPadreHtml(padreIdElegido, excluirId) {
+      const opciones = preguntasCache
+        .filter((p) => p.id !== excluirId)
+        .map((p) => ({ id: p.id, texto: `${p.modulo_nombre} — ${rutaPregunta(p)}` }))
+        .sort((a, b) => a.texto.localeCompare(b.texto, "es"))
+        .map((p) => `<option value="${p.id}" ${p.id === padreIdElegido ? "selected" : ""}>${p.texto}</option>`)
+        .join("");
+      return `<option value="">— Ninguna (pregunta principal del módulo) —</option>${opciones}`;
+    }
+
+    // Con padre elegido, el módulo lo pone el padre: se deshabilita el select
+    // de módulo para que no parezca que se puede elegir otro.
+    function sincronizarModuloConPadre(selectPadre, selectModulo) {
+      const padre = preguntasCache.find((p) => p.id === Number(selectPadre.value));
+      selectModulo.disabled = !!padre;
+      if (padre) selectModulo.value = String(padre.modulo_id);
+    }
+
+    function llenarSelectPadre() {
+      const select = document.getElementById("nuevaPreguntaPadre");
+      const elegido = Number(select.value) || null;
+      select.innerHTML = opcionesPadreHtml(elegido, null);
+      sincronizarModuloConPadre(select, document.getElementById("nuevaPreguntaModulo"));
+    }
+
+    document.getElementById("nuevaPreguntaPadre").addEventListener("change", (evento) => {
+      sincronizarModuloConPadre(evento.target, document.getElementById("nuevaPreguntaModulo"));
+    });
 
     function pintarPreguntasAdmin(lista) {
       const contenedor = document.getElementById("listaPreguntasAdmin");
@@ -268,7 +321,7 @@
 
         fila.innerHTML = `
           <summary>
-            <span class="fila-pregunta-texto">${pregunta.pregunta}</span>
+            <span class="fila-pregunta-texto">${rutaPregunta(pregunta)}</span>
             <span class="fila-pregunta-modulo">${pregunta.modulo_nombre}</span>
             <span class="fila-pregunta-estado ${pregunta.activo ? "" : "inactiva"}">${
               pregunta.activo ? "Activa" : "Inactiva"
@@ -277,6 +330,8 @@
           <div class="fila-pregunta-cuerpo">
             <label>Módulo</label>
             <select class="input-modulo">${opcionesModulo}</select>
+            <label>Es una opción de</label>
+            <select class="input-padre">${opcionesPadreHtml(pregunta.padre_id, pregunta.id)}</select>
             <label>Pregunta</label>
             <input type="text" class="input-pregunta" value="${pregunta.pregunta}" />
             <label>Respuesta</label>
@@ -288,6 +343,11 @@
           </div>
         `;
 
+        const selectPadre = fila.querySelector(".input-padre");
+        const selectModulo = fila.querySelector(".input-modulo");
+        sincronizarModuloConPadre(selectPadre, selectModulo);
+        selectPadre.addEventListener("change", () => sincronizarModuloConPadre(selectPadre, selectModulo));
+
         fila.querySelector(".btn-guardar-pregunta").addEventListener("click", () => guardarPregunta(pregunta.id, fila));
         contenedor.appendChild(fila);
       }
@@ -295,6 +355,7 @@
 
     async function guardarPregunta(id, fila) {
       const moduloId = Number(fila.querySelector(".input-modulo").value);
+      const padreId = Number(fila.querySelector(".input-padre").value) || null;
       const pregunta = fila.querySelector(".input-pregunta").value.trim();
       const respuesta = fila.querySelector(".input-respuesta").value.trim();
       const activo = fila.querySelector(".input-activo").checked;
@@ -303,7 +364,7 @@
         await pedirJson(`/api/faq-admin/preguntas/${id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ moduloId, pregunta, respuesta, activo }),
+          body: JSON.stringify({ moduloId, padreId, pregunta, respuesta, activo }),
         });
         await cargarPreguntasAdmin();
       } catch (error) {
@@ -317,6 +378,7 @@
       errorEl.textContent = "";
 
       const moduloId = Number(document.getElementById("nuevaPreguntaModulo").value);
+      const padreId = Number(document.getElementById("nuevaPreguntaPadre").value) || null;
       const pregunta = document.getElementById("nuevaPreguntaTexto").value.trim();
       const respuesta = document.getElementById("nuevaPreguntaRespuesta").value.trim();
 
@@ -324,9 +386,12 @@
         await pedirJson("/api/faq-admin/preguntas", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ moduloId, pregunta, respuesta }),
+          body: JSON.stringify({ moduloId, padreId, pregunta, respuesta }),
         });
-        document.getElementById("formNuevaPregunta").reset();
+        // Se limpian los textos pero se deja elegido el padre: lo normal es
+        // cargar varias opciones seguidas del mismo padre (una por impresora).
+        document.getElementById("nuevaPreguntaTexto").value = "";
+        document.getElementById("nuevaPreguntaRespuesta").value = "";
         await cargarPreguntasAdmin();
       } catch (error) {
         errorEl.textContent = error.message;
@@ -339,7 +404,7 @@
         pintarPreguntasAdmin(preguntasCache);
         return;
       }
-      pintarPreguntasAdmin(preguntasCache.filter((p) => p.pregunta.toLowerCase().includes(texto)));
+      pintarPreguntasAdmin(preguntasCache.filter((p) => rutaPregunta(p).toLowerCase().includes(texto)));
     });
 
     (async function iniciar() {

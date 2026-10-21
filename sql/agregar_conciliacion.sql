@@ -26,14 +26,33 @@ BEGIN
 END
 GO
 
--- Quién puede usar la conciliación (los admin pueden siempre) y quién puede
--- cerrar el mes. Reabrir un mes cerrado queda sólo para admin.
+-- Quién puede usar la conciliación, quién puede cerrar el mes y quién puede
+-- reabrir uno cerrado. No depende del rol: un admin sin fila acá no entra.
+-- Se administra desde Gestión de Usuarios.
 IF OBJECT_ID('conc_permisos', 'U') IS NULL
 CREATE TABLE conc_permisos (
-    usuario_id   INT      NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES app_usuarios(id),
-    puede_cerrar BIT      NOT NULL DEFAULT 0,
-    fecha_alta   DATETIME NOT NULL DEFAULT GETDATE()
+    usuario_id    INT      NOT NULL PRIMARY KEY FOREIGN KEY REFERENCES app_usuarios(id),
+    puede_cerrar  BIT      NOT NULL DEFAULT 0,
+    puede_reabrir BIT      NOT NULL DEFAULT 0,
+    fecha_alta    DATETIME NOT NULL DEFAULT GETDATE()
 );
+GO
+
+-- Bases creadas antes de puede_reabrir (cuando los admin entraban siempre):
+-- agrega la columna y, una sola vez, les da permiso completo a los admin de
+-- ese momento para que nadie se quede afuera. Después se ajusta a mano.
+IF COL_LENGTH('conc_permisos', 'puede_reabrir') IS NULL
+BEGIN
+    ALTER TABLE conc_permisos ADD puede_reabrir BIT NOT NULL DEFAULT 0;
+    EXEC('
+        UPDATE p SET puede_cerrar = 1, puede_reabrir = 1
+        FROM conc_permisos p JOIN app_usuarios u ON u.id = p.usuario_id
+        WHERE u.rol = ''admin'';
+        INSERT INTO conc_permisos (usuario_id, puede_cerrar, puede_reabrir)
+        SELECT id, 1, 1 FROM app_usuarios u
+        WHERE rol = ''admin'' AND NOT EXISTS (SELECT 1 FROM conc_permisos p WHERE p.usuario_id = u.id);
+    ');
+END
 GO
 
 -- Un período = un banco en un mes. Guarda el resultado de la última lectura.

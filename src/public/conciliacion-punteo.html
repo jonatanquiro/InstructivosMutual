@@ -181,7 +181,7 @@
       }
       document.getElementById("linkInforme").href = `/conciliacion-informe.html?id=${p.id}`;
       document.getElementById("btnCerrarMes").hidden = !(p.estado === "abierto" && datos.permiso?.puedeCerrar);
-      document.getElementById("btnReabrirMes").hidden = !(p.estado === "cerrado" && datos.permiso?.esAdmin);
+      document.getElementById("btnReabrirMes").hidden = !(p.estado === "cerrado" && datos.permiso?.puedeReabrir);
 
       armarBloques();
       pintarResumen();

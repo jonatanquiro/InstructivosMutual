@@ -872,7 +872,7 @@
           <a class="conc-boton secundario" href="/conciliacion-informe.html?id=${p.id}" target="_blank">🖨 Imprimir informe</a>
           <a class="conc-boton secundario" href="/conciliacion-punteo.html?id=${p.id}" target="_blank">Ver todo junto, como en papel</a>
           ${p.estado === "abierto" && datos.permiso?.puedeCerrar ? `<button type="button" class="conc-boton" id="btnCerrarMes" ${c.propuestas ? "disabled" : ""}>🔒 Cerrar el mes</button>` : ""}
-          ${p.estado === "cerrado" && datos.permiso?.esAdmin ? `<button type="button" class="conc-boton secundario" id="btnReabrir">Reabrir el mes</button>` : ""}
+          ${p.estado === "cerrado" && datos.permiso?.puedeReabrir ? `<button type="button" class="conc-boton secundario" id="btnReabrir">Reabrir el mes</button>` : ""}
         </div>`;
 
       document.getElementById("btnCerrarMes")?.addEventListener("click", async () => {

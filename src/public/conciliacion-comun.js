@@ -38,11 +38,57 @@ const NOMBRE_LADO = { M: "Mayor", R: "Mayor (mes anterior)", B: "Banco", Q: "Ban
 
 // Socio: el CUIT del detalle del banco está o no en la base de socios.
 // Sin vueltas: si está, es socio (aunque tenga fecha de baja cargada).
+// Si no es socio, se busca la razón social en el BCRA y se completa la
+// etiqueta cuando llega la respuesta (sin frenar el dibujo de la pantalla).
 function etiquetaSocio(m, datos) {
   if (esMayor(m) || !m.cuit || m.cuit === datos.cuitPropio || m.rubro_gasto || !datos.socios) return "";
   const registros = datos.socios[m.cuit];
-  if (!registros) return `<span class="conc-socio conc-socio-no" title="CUIT ${m.cuit}">No figura como socio</span>`;
+  if (!registros) {
+    pedirNombreBcra(m.cuit);
+    return `<span class="conc-socio conc-socio-no" title="CUIT ${m.cuit}" data-cuit-bcra="${m.cuit}">${textoNoSocio(m.cuit)}</span>`;
+  }
   return `<span class="conc-socio conc-socio-si" title="CUIT ${m.cuit}">Socio: ${esc(registros[0].nombre)}</span>`;
+}
+
+// CUIT → razón social del BCRA (null si no la tiene). Sin la clave: todavía
+// no se preguntó o la respuesta no llegó.
+const nombresBcra = new Map();
+const cuitsPedidosBcra = new Set();
+const colaBcra = [];
+let consultasBcraEnCurso = 0;
+
+function textoNoSocio(cuit) {
+  const nombre = nombresBcra.get(cuit);
+  return nombre ? `No figura como socio · ${esc(nombre)} (BCRA)` : "No figura como socio";
+}
+
+function pedirNombreBcra(cuit) {
+  if (cuitsPedidosBcra.has(cuit)) return;
+  cuitsPedidosBcra.add(cuit);
+  colaBcra.push(cuit);
+  atenderColaBcra();
+}
+
+// De a pocos a la vez, para no saturar la API del BCRA con un período largo.
+function atenderColaBcra() {
+  while (consultasBcraEnCurso < 4 && colaBcra.length) {
+    const cuit = colaBcra.shift();
+    consultasBcraEnCurso++;
+    fetch(`/api/bcra/nombre/${cuit}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((r) => {
+        if (!r) return;
+        nombresBcra.set(cuit, r.denominacion);
+        for (const span of document.querySelectorAll(`[data-cuit-bcra="${cuit}"]`)) {
+          span.innerHTML = textoNoSocio(cuit);
+        }
+      })
+      .catch(() => {})
+      .finally(() => {
+        consultasBcraEnCurso--;
+        atenderColaBcra();
+      });
+  }
 }
 
 // Pregunta con botones propios (en vez de confirm() del navegador). Devuelve

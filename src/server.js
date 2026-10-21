@@ -117,7 +117,7 @@ app.get("/chat.html", requiereLogin, requiereChatActivo, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "chat.html"));
 });
 
-// Conciliación bancaria: sólo admins y usuarias habilitadas en conc_permisos.
+// Conciliación bancaria: sólo usuarios habilitados en conc_permisos (no depende del rol).
 for (const pagina of ["conciliacion.html", "conciliacion-banco.html", "conciliacion-punteo.html", "conciliacion-informe.html"]) {
   app.get(`/${pagina}`, requiereLogin, requiereConciliacion, (req, res) => {
     res.sendFile(path.join(__dirname, "public", pagina));

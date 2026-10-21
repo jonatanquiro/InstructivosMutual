@@ -34,21 +34,21 @@ function requiereAdmin(req, res, next) {
   return res.redirect("/");
 }
 
-// Permiso de conciliación bancaria: admins siempre; el resto sólo si figura
-// en conc_permisos. Se consulta en cada request (no se guarda en la sesión)
-// para que dar o quitar el permiso tenga efecto sin volver a loguearse.
+// Permiso de conciliación bancaria: sólo quien figura en conc_permisos, sea
+// admin o no (se reparte desde Gestión de Usuarios). Se consulta en cada
+// request (no se guarda en la sesión) para que dar o quitar el permiso tenga
+// efecto sin volver a loguearse.
 async function permisoConciliacion(req) {
-  const esAdmin = req.session.rol === "admin";
   const pool = await getPool();
   const resultado = await pool
     .request()
     .input("usuarioId", sql.Int, req.session.usuarioId)
-    .query("SELECT puede_cerrar FROM conc_permisos WHERE usuario_id = @usuarioId");
+    .query("SELECT puede_cerrar, puede_reabrir FROM conc_permisos WHERE usuario_id = @usuarioId");
   const fila = resultado.recordset[0];
   return {
-    acceso: esAdmin || !!fila,
-    puedeCerrar: esAdmin || !!fila?.puede_cerrar,
-    esAdmin,
+    acceso: !!fila,
+    puedeCerrar: !!fila?.puede_cerrar,
+    puedeReabrir: !!fila?.puede_reabrir,
   };
 }
 

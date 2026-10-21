@@ -20,9 +20,12 @@ GO
 -- Preguntas frecuentes: cada una pertenece a un módulo y ya trae su respuesta
 -- escrita (texto plano o con saltos de línea; se puede ampliar a HTML simple
 -- más adelante si hace falta formato o imágenes).
+-- padre_id: si no es NULL, la pregunta es una opción de otra (preguntas
+-- anidadas); la respuesta del padre funciona como la sub-pregunta.
 CREATE TABLE app_preguntas (
     id            INT IDENTITY(1,1) PRIMARY KEY,
     modulo_id     INT NOT NULL FOREIGN KEY REFERENCES app_modulos(id),
+    padre_id      INT NULL FOREIGN KEY REFERENCES app_preguntas(id),
     pregunta      NVARCHAR(300) NOT NULL,
     respuesta     NVARCHAR(MAX) NOT NULL,
     orden         INT NOT NULL DEFAULT 0,

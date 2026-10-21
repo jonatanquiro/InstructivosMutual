@@ -1458,6 +1458,17 @@ body.modo-presentacion .filtros-proyectos {
   font-size: 1rem;
 }
 
+.ayuda-pregunta-anidada {
+  margin: 0.4rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: var(--texto-secundario);
+}
+
+.form-usuario select:disabled {
+  opacity: 0.6;
+}
+
 .form-usuario textarea {
   padding: 0.55rem;
   border: 1px solid var(--borde);

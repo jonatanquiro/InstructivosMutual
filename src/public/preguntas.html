@@ -122,9 +122,33 @@
         }
 
         agregarBurbuja(opcion.etiqueta, "usuario");
-        agregarBurbuja(opcion.pregunta.respuesta, "bot", true);
-        registrarConsulta(opcion.pregunta.id);
+        responderPregunta(opcion.pregunta, modulo);
+      });
+    }
+
+    // Si la pregunta tiene hijas (preguntas anidadas), su respuesta es la
+    // sub-pregunta ("¿Qué impresora tenés?") y las hijas son las opciones;
+    // se repite hasta llegar a una pregunta sin hijas, que es la respuesta final.
+    function responderPregunta(pregunta, modulo) {
+      agregarBurbuja(pregunta.respuesta, "bot", true);
+      registrarConsulta(pregunta.id);
+
+      if (pregunta.hijas.length === 0) {
         mostrarSeguirModulo(modulo);
+        return;
+      }
+
+      const opciones = pregunta.hijas.map((h) => ({ etiqueta: h.pregunta, pregunta: h }));
+      opciones.push({ etiqueta: `◂ Volver a "${modulo.nombre}"`, volver: true });
+
+      agregarOpciones(opciones, (opcion) => {
+        if (opcion.volver) {
+          agregarBurbuja(opcion.etiqueta, "usuario");
+          mostrarPreguntas(modulo);
+          return;
+        }
+        agregarBurbuja(opcion.etiqueta, "usuario");
+        responderPregunta(opcion.pregunta, modulo);
       });
     }
 
