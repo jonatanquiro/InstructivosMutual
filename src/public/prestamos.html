@@ -24,22 +24,9 @@
   </header>
 
   <main class="main-proyectos">
-    <div class="prest-planilla">
-      <div>
-        <div id="origen">Leyendo la planilla…</div>
-        <div class="prest-sub">El estado y el motivo de rechazo se deducen de lo escrito en Comentarios y Fecha de liq.</div>
-      </div>
-      <label class="btn-chico prest-btn-subir" id="btnSubir">
-        📤 Subir planilla
-        <input type="file" id="archivoPlanilla" accept=".xlsx" hidden />
-      </label>
-    </div>
     <div class="error" id="errorCarga"></div>
 
-    <div class="sin-resultados" id="sinPlanilla" hidden>
-      Todavía no se subió la planilla. Usá «Subir planilla» y elegí <strong>CONTROL PRÉSTAMOS.xlsx</strong>
-      (la de siempre, con una hoja por mes). Cada vez que la actualicen, se vuelve a subir y reemplaza a la anterior.
-    </div>
+    <div class="sin-resultados" id="sinPlanilla" hidden>Todavía no hay solicitudes cargadas.</div>
 
     <div id="contenido" hidden>
       <div class="filtros-proyectos">
@@ -135,7 +122,6 @@
     const graficos = {};
     let solicitudes = [];
     let periodos = [];
-    let filtrosListos = false;
 
     function escapar(texto) {
       return String(texto ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
@@ -259,10 +245,7 @@
       return lista.map((p) => `<option value="${p}">${etiquetaPeriodo(p)}</option>`).join("");
     }
 
-    // Se rehace cada vez que se sube una planilla (pueden aparecer meses o
-    // vendedores nuevos); los listeners se enganchan una sola vez.
     function prepararFiltros() {
-      const anteriores = { desde: filtroDesde.value, hasta: filtroHasta.value, vendedor: filtroVendedor.value };
       periodos = [...new Set(solicitudes.map((s) => s.periodo))].sort();
       filtroDesde.innerHTML = opcionesPeriodos(periodos);
       filtroHasta.innerHTML = opcionesPeriodos(periodos);
@@ -285,13 +268,10 @@
         '<option value="">Todos</option><option value="__curso">En curso (sin cerrar)</option>' +
         ESTADOS.map((e) => `<option>${e.nombre}</option>`).join("");
 
-      // Por defecto, los últimos 12 meses de la planilla.
-      filtroDesde.value = periodos.includes(anteriores.desde) ? anteriores.desde : periodos[Math.max(0, periodos.length - 12)];
+      // Por defecto, los últimos 12 meses.
+      filtroDesde.value = periodos[Math.max(0, periodos.length - 12)];
       filtroHasta.value = periodos[periodos.length - 1];
-      if (vendedores.includes(anteriores.vendedor)) filtroVendedor.value = anteriores.vendedor;
 
-      if (filtrosListos) return;
-      filtrosListos = true;
       for (const el of [filtroDesde, filtroHasta, filtroVendedor, filtroEstado]) el.addEventListener("change", pintar);
       for (const el of [compararA, compararB]) el.addEventListener("change", () => pintarComparacion(filtradasSinRango()));
       let espera;
@@ -611,9 +591,8 @@
       pintarDetalle(lista);
     }
 
-    // --- Carga y subida de la planilla ---
+    // --- Carga ---
 
-    const origen = document.getElementById("origen");
     const errorCarga = document.getElementById("errorCarga");
 
     async function cargar() {
@@ -625,55 +604,21 @@
         }
         const datos = await respuesta.json();
         if (!respuesta.ok) {
-          origen.textContent = "";
-          errorCarga.textContent = datos.error || "No se pudo leer la planilla.";
+          errorCarga.textContent = datos.error || "No se pudieron leer los préstamos.";
           return;
         }
         if (datos.sinPlanilla) {
-          origen.textContent = "Sin planilla cargada.";
           document.getElementById("sinPlanilla").hidden = false;
           return;
         }
         solicitudes = datos.solicitudes.filter((s) => s.periodo);
-        const cuando = datos.subidaEl ? new Date(datos.subidaEl).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "";
-        const deFox = solicitudes.filter((s) => s.origen !== "EXCEL").length;
-        origen.innerHTML = `${solicitudes.length} solicitudes en la base` +
-          (deFox ? ` (${deFox} cargadas desde el sistema)` : "") +
-          (datos.archivo ? ` · última planilla: <strong>${escapar(datos.archivo)}</strong>` : "") +
-          (cuando ? `, subida ${datos.subidaPor ? "por " + escapar(datos.subidaPor) + " " : ""}el ${cuando}` : "");
-        document.getElementById("sinPlanilla").hidden = true;
         prepararFiltros();
         document.getElementById("contenido").hidden = false;
         pintar();
       } catch (e) {
-        origen.textContent = "";
         errorCarga.textContent = "No se pudo conectar con el servidor.";
       }
     }
-
-    document.getElementById("archivoPlanilla").addEventListener("change", async (evento) => {
-      const archivo = evento.target.files[0];
-      evento.target.value = "";
-      if (!archivo) return;
-      const boton = document.getElementById("btnSubir");
-      boton.classList.add("prest-subiendo");
-      errorCarga.textContent = "";
-      origen.textContent = `Subiendo y leyendo «${archivo.name}»…`;
-      try {
-        const formulario = new FormData();
-        formulario.append("archivo", archivo);
-        const respuesta = await fetch("/api/prestamos/planilla", { method: "POST", body: formulario });
-        const datos = await respuesta.json();
-        if (!respuesta.ok) {
-          errorCarga.textContent = (datos.error || "No se pudo subir la planilla.") + " Quedó la que estaba antes.";
-        }
-      } catch (e) {
-        errorCarga.textContent = "No se pudo conectar con el servidor.";
-      } finally {
-        boton.classList.remove("prest-subiendo");
-        cargar();
-      }
-    });
 
     cargar();
   </script>

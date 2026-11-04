@@ -165,10 +165,8 @@ de rechazo, resultado por vendedor y el listado completo con filtros (meses, ven
 búsqueda por socio o comentario). Los datos se guardan en la base UNION (tablas `PRPL*`), así el
 sistema en Fox puede cargar solicitudes ahí mismo y aparecen en la pestaña al instante.
 
-Mientras tanto la planilla se sigue llevando en Excel y se sube con «Subir planilla» cada vez
-que se quiera ver actualizada: reemplaza lo importado antes (no lo cargado desde Fox) y se ve
-quién la subió y cuándo. Si el archivo no se puede leer, avisa y quedan los datos que estaban.
-Los vendedores se unifican con el usuario del sistema (Kitu = Cristian, Mili/Miriam = Mirian,
+La planilla de Excel ya no se usa: se importó una sola vez (1.085 solicitudes, oct 2024 a nov
+2026) y de ahora en más se carga desde Fox. Los vendedores se unifican con el usuario del sistema (Kitu = Cristian, Mili/Miriam = Mirian,
 Negrucho = Alfredo...); los que no se sabe quién son aparecen como «(sin asignar)».
 
 Como la planilla tiene una hoja por mes, todo se puede mirar por mes: atajos (último mes,
