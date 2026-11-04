@@ -636,8 +636,11 @@
         }
         solicitudes = datos.solicitudes.filter((s) => s.periodo);
         const cuando = datos.subidaEl ? new Date(datos.subidaEl).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" }) : "";
-        origen.innerHTML = `<strong>${escapar(datos.archivo || "Planilla")}</strong> · ${datos.hojas.length} hojas mensuales` +
-          (cuando ? ` · subida ${datos.subidaPor ? "por " + escapar(datos.subidaPor) + " " : ""}el ${cuando}` : "");
+        const deFox = solicitudes.filter((s) => s.origen !== "EXCEL").length;
+        origen.innerHTML = `${solicitudes.length} solicitudes en la base` +
+          (deFox ? ` (${deFox} cargadas desde el sistema)` : "") +
+          (datos.archivo ? ` · última planilla: <strong>${escapar(datos.archivo)}</strong>` : "") +
+          (cuando ? `, subida ${datos.subidaPor ? "por " + escapar(datos.subidaPor) + " " : ""}el ${cuando}` : "");
         document.getElementById("sinPlanilla").hidden = true;
         prepararFiltros();
         document.getElementById("contenido").hidden = false;

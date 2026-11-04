@@ -3,12 +3,15 @@ const path = require("path");
 const crypto = require("crypto");
 const express = require("express");
 const multer = require("multer");
+const { sql, getPool } = require("../config/db");
 const { ejecutarScript, ErrorMotor, RAIZ } = require("../config/motor");
+const { volcarExcel, leerSolicitudes, faltanTablas } = require("./prestamos-datos");
 
 const router = express.Router();
 
-// La planilla que llevan a mano en préstamos (una hoja por mes) se sube desde
-// la pestaña. Se guarda una sola, la última; la anterior queda como respaldo.
+// Los datos viven en la base UNION (tablas PRPL*, ver prestamos-datos.js).
+// La planilla de Excel que llevan a mano se sube desde la pestaña y se vuelca
+// ahí; el archivo se guarda igual (el último y el anterior) como respaldo.
 // PRESTAMOS_CARPETA puede ser absoluta (otro disco) o relativa a src/.
 const CONFIGURADA = process.env.PRESTAMOS_CARPETA || "uploads/prestamos";
 const CARPETA = path.isAbsolute(CONFIGURADA) ? CONFIGURADA : path.join(__dirname, "..", CONFIGURADA);
@@ -17,6 +20,8 @@ const ANTERIOR = path.join(CARPETA, "planilla-anterior.xlsx");
 const DATOS_SUBIDA = path.join(CARPETA, "planilla.json");
 const SCRIPT = path.join(RAIZ, "motor", "prestamos.py");
 fs.mkdirSync(CARPETA, { recursive: true });
+
+const FALTAN_TABLAS = "Faltan las tablas de préstamos en la base UNION: hay que correr sql/union_prestamos_planilla.sql.";
 
 const upload = multer({
   storage: multer.diskStorage({
@@ -27,14 +32,6 @@ const upload = multer({
   fileFilter: (req, file, cb) => cb(null, /\.xlsx$/i.test(file.originalname)),
 });
 
-// Leerla con Python tarda un par de segundos: se guarda el resultado y sólo
-// se vuelve a leer cuando se sube otra.
-let cache = null;
-
-function leerPlanilla(archivo) {
-  return ejecutarScript(SCRIPT, [], { archivo }, 60 * 1000);
-}
-
 function datosSubida() {
   try {
     return JSON.parse(fs.readFileSync(DATOS_SUBIDA, "utf8"));
@@ -43,23 +40,21 @@ function datosSubida() {
   }
 }
 
+// Se lee de la base en cada pedido (no hay caché): así aparece al instante
+// lo que se cargue desde Fox.
 router.get("/prestamos", async (req, res) => {
-  if (!fs.existsSync(PLANILLA)) return res.json({ sinPlanilla: true });
-
   try {
-    if (!cache) {
-      const datos = await leerPlanilla(PLANILLA);
-      if (!datos.ok) return res.status(422).json({ error: datos.error });
-      cache = datos;
-    }
-    res.json({ ...datosSubida(), hojas: cache.hojas, solicitudes: cache.solicitudes });
+    const solicitudes = await leerSolicitudes(await getPool());
+    if (!solicitudes.length) return res.json({ sinPlanilla: true });
+    res.json({ ...datosSubida(), solicitudes });
   } catch (error) {
-    if (!(error instanceof ErrorMotor)) console.error("Error leyendo la planilla de préstamos:", error);
-    res.status(500).json({ error: error instanceof ErrorMotor ? error.message : "No se pudo leer la planilla de préstamos." });
+    if (faltanTablas(error)) return res.status(500).json({ error: FALTAN_TABLAS });
+    console.error("Error leyendo préstamos de UNION:", error);
+    res.status(500).json({ error: "No se pudieron leer los préstamos de la base." });
   }
 });
 
-// Se lee antes de reemplazar: si la planilla nueva no se puede leer, queda la que estaba.
+// Se lee antes de tocar nada: si la planilla nueva no se puede leer, quedan los datos que estaban.
 router.post("/prestamos/planilla", (req, res, next) => {
   upload.single("archivo")(req, res, (error) => {
     if (error) {
@@ -74,7 +69,7 @@ router.post("/prestamos/planilla", (req, res, next) => {
   const borrarTemporal = () => fs.promises.unlink(temporal).catch(() => {});
 
   try {
-    const datos = await leerPlanilla(temporal);
+    const datos = await ejecutarScript(SCRIPT, [], { archivo: temporal }, 60 * 1000);
     if (!datos.ok) {
       borrarTemporal();
       return res.status(422).json({ error: datos.error });
@@ -83,6 +78,13 @@ router.post("/prestamos/planilla", (req, res, next) => {
       borrarTemporal();
       return res.status(422).json({ error: "La planilla no tiene ninguna hoja con la columna SOCIO: ¿es la de control de préstamos?" });
     }
+
+    const pool = await getPool();
+    // USUAPLIC en UNION guarda el usuario (no el nombre completo), como el resto del sistema.
+    const { recordset } = await pool.request().input("id", sql.Int, req.session.usuarioId)
+      .query("SELECT nombre_usuario FROM app_usuarios WHERE id = @id");
+    const usuario = (recordset[0]?.nombre_usuario || req.session.nombreCompleto || "").toUpperCase();
+    const resultado = await volcarExcel(pool, datos.solicitudes, usuario);
 
     if (fs.existsSync(PLANILLA)) fs.copyFileSync(PLANILLA, ANTERIOR);
     fs.renameSync(temporal, PLANILLA);
@@ -93,13 +95,14 @@ router.post("/prestamos/planilla", (req, res, next) => {
       archivo: nombre,
       subidaPor: req.session.nombreCompleto || "",
       subidaEl: new Date().toISOString(),
+      hojas: datos.hojas.length,
     }));
-    cache = datos;
-    res.json({ ok: true, solicitudes: datos.solicitudes.length, hojas: datos.hojas.length });
+    res.json({ ok: true, ...resultado });
   } catch (error) {
     borrarTemporal();
+    if (faltanTablas(error)) return res.status(500).json({ error: FALTAN_TABLAS });
     if (!(error instanceof ErrorMotor)) console.error("Error subiendo la planilla de préstamos:", error);
-    res.status(500).json({ error: error instanceof ErrorMotor ? error.message : "No se pudo guardar la planilla." });
+    res.status(500).json({ error: error instanceof ErrorMotor ? error.message : "No se pudo guardar la planilla en la base." });
   }
 });
 

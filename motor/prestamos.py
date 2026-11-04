@@ -39,10 +39,6 @@ COLUMNAS = {
     'ENVIADO A ARCHIVO': 'enviadoArchivo', 'OTORGADO': 'otorgado',
 }
 
-# Apodos y variantes con que se carga el mismo vendedor.
-VENDEDORES = {'wali': 'Walter', 'walli': 'Walter', 'waly': 'Walter', 'mirian': 'Miriam',
-              'refinanciacion': '(Refinanciación)'}
-
 # Motivo de rechazo -> palabras que lo delatan (sobre texto sin tildes y en minúscula).
 MOTIVOS = [
     ('Rojo / informado en otras entidades', r'rojo|informad|fast ?cred|finan ?ya|naranja|credixa|megatone|'
@@ -110,13 +106,14 @@ def _plazo(valor):
 
 
 def _vendedor(valor):
+    """(texto, clave). La clave (minúscula, sin tildes) se busca en la tabla de
+    alias UNION.dbo.PRPLVENALI, que dice a qué usuario corresponde cada apodo."""
     texto = _texto(valor)
     if not texto:
-        return 'Sin dato'
+        return '', ''
     # "Walter (Alicia)": vendió Walter, lo vio Alicia.
-    texto = texto.split('(')[0].strip() or texto
-    clave = _sin_tildes(texto).lower()
-    return VENDEDORES.get(clave, texto[:1].upper() + texto[1:].lower())
+    principal = texto.split('(')[0].strip() or texto
+    return texto, _sin_tildes(principal).lower()
 
 
 def _estado(liquidado, texto):
@@ -190,6 +187,7 @@ def leer_hoja(hoja):
                                      _texto(celda(fila, 'otorgado'))])).lower()
         estado = _estado(liquidado, todo)
         meses, plazo = _plazo(celda(fila, 'plazo'))
+        vendedor, clave_vendedor = _vendedor(celda(fila, 'vendedor'))
         registros.append({
             'fila': numero,
             'fecha': _fecha(celda(fila, 'fecha')),
@@ -201,7 +199,8 @@ def leer_hoja(hoja):
             'plazo': plazo,
             'fechaLiq': _fecha(fecha_liq),
             'formaPago': forma_pago,
-            'vendedor': _vendedor(celda(fila, 'vendedor')),
+            'vendedor': vendedor,
+            'vendedorClave': clave_vendedor,
             'comentarios': comentarios,
             'enviadoArchivo': _fecha(celda(fila, 'enviadoArchivo')),
             'estado': estado,

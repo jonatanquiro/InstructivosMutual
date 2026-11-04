@@ -234,13 +234,37 @@ beep + badges) lo maneja `chat-flotante.js` — ver detalle en `src/public/` má
   (busca en cada una la fila de encabezados que dice SOCIO, porque cambia de lugar; las filas
   sin socio son totales al pie y se saltean), deduce `estado` y `motivos` del texto y devuelve
   JSON. Las reglas de estado y motivos son las listas `MOTIVOS` / `_estado()` del mismo archivo.
+  El vendedor sale tal cual más una clave (minúscula, sin tildes) que se busca en `PRPLVENALI`.
+- **Los datos viven en la base UNION** (tablas `PRPL*`, creadas con
+  `sql/union_prestamos_planilla.sql`), para que el sistema en Fox lea y cargue lo mismo.
+- `src/routes/prestamos-datos.js`: `volcarExcel()` borra lo importado del Excel
+  (`PLORIGEN = 'EXCEL'`) y lo vuelve a insertar en una transacción, salvo las filas que alguien
+  corrigió desde Fox (`USUMODIF` no nulo): esas se conservan y no se reinsertan (misma hoja y
+  socio). Lo cargado desde Fox no se toca nunca. `leerSolicitudes()` arma lo que muestra la página.
 - `src/routes/prestamos.routes.js` (solo admin): `POST /api/prestamos/planilla` recibe el
-  .xlsx (multer), lo lee con el script y sólo si da bien lo guarda como `planilla.xlsx` en
-  `PRESTAMOS_CARPETA` (la anterior pasa a `planilla-anterior.xlsx`; quién y cuándo, en
-  `planilla.json`). `GET /api/prestamos` devuelve lo leído, cacheado en memoria hasta la
-  próxima subida (`{ sinPlanilla: true }` si nunca se subió).
+  .xlsx (multer), lo lee con el script y, si da bien, lo vuelca a UNION y guarda el archivo
+  como respaldo en `PRESTAMOS_CARPETA` (`planilla.xlsx` / `planilla-anterior.xlsx`; quién y
+  cuándo, en `planilla.json`). `GET /api/prestamos` lee de UNION en cada pedido, sin caché, así
+  aparece al instante lo cargado desde Fox (`{ sinPlanilla: true }` si la tabla está vacía).
 - `src/public/prestamos.html`: indicadores, gráficos (Chart.js), mes a mes, comparación de dos
   meses, por vendedor y detalle; todo el filtrado es en el navegador.
+
+### Tablas en UNION (para la pantalla en Fox)
+
+- `PRPLANILLA`: una fila por solicitud. Para cargar desde Fox alcanza con `PLFECHA`, `PLANIO`,
+  `PLMES` (el mes en que se cuenta, normalmente el de la fecha), `PLSOCIO`, `PLIMPORTE`,
+  `PLPLAZO` (meses; si son días, `PLPLAZOTX`), `PLVENDEDOR` (`Usuarios.id`), `PLESTADO` y
+  `USUAPLIC`. `PLORIGEN` queda en `'FOX'` por defecto: **no usar `'EXCEL'`**, que es lo que
+  se borra y reinserta en cada subida de la planilla. Opcionales: `PLSONUME` (nº de socio),
+  `PLCONYUGE`, `PLGARANTE`, `PLFECLIQ`, `PLFORMAPAG`, `PLCOMENT`, `PLENVARCH`.
+- Al **modificar** una fila (sea de Fox o importada del Excel), completar `USUMODIF` y
+  `ULTMODIF`: así una próxima subida de la planilla no pisa la corrección.
+- `PRPLESTADO` (combo de estado; `ESCERRADO = 0` son los "en curso"), `PRPLMOTIVO` y
+  `PRPLSOLMOT` (motivos de un rechazo, puede haber varios; se borran solos con la solicitud).
+- `PRPLVENALI`: apodo con que se escribe un vendedor en la planilla → `Usuarios.id`. Si aparece
+  un vendedor nuevo o hay que corregir uno, se arregla acá y se vuelve a subir la planilla.
+- Ojo: mientras se siga subiendo el Excel, los `ID` de las filas importadas cambian en cada
+  subida (se reinsertan). Las de Fox mantienen el suyo.
 
 ## Conciliación bancaria
 
@@ -464,6 +488,9 @@ alguien los edita a mano salvo `export-bd.json` que lo genera `exportar-bd.js`).
   `app_config_usuario` para bases que ya tenían esa tabla solo con `tema`. **Hay que correrlo a
   mano una vez contra la base INFORMA real** antes de que la sección "Datos personales" de
   Configuración funcione ahí; en una base nueva alcanza con el `schema.sql` actualizado.
+- **union_prestamos_planilla.sql**: crea (idempotente) las tablas `PRPL*` del control de
+  préstamos **en la base UNION** (empieza con `USE [UNION]`), con los estados, motivos y alias
+  de vendedores iniciales. Ya corrido en la base real (2026-11-04) y cargado con la planilla.
 - **agregar_preguntas_anidadas.sql**: agrega (idempotente) `app_preguntas.padre_id` (FK a la
   misma tabla) para preguntas anidadas. **Hay que correrlo a mano una vez contra la base INFORMA
   real** antes de desplegar el código nuevo: sin esa columna, `GET /api/modulos` y el admin de

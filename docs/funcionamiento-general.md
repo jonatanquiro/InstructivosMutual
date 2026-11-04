@@ -162,10 +162,14 @@ Los datos salen de un data warehouse separado, actualizado por procesos aparte d
 Muestra de otra forma la planilla que se lleva a mano en préstamos (`CONTROL PRÉSTAMOS.xlsx`,
 una hoja por mes): cuántas solicitudes entran por mes y cómo terminan, monto liquidado, motivos
 de rechazo, resultado por vendedor y el listado completo con filtros (meses, vendedor, estado,
-búsqueda por socio o comentario). La planilla se sigue llevando igual que siempre en Excel y se
-sube desde la pestaña con «Subir planilla» cada vez que se quiera ver actualizada: reemplaza a la
-anterior (que queda como respaldo) y se ve quién la subió y cuándo. Si el archivo no se puede
-leer, avisa y queda la que estaba.
+búsqueda por socio o comentario). Los datos se guardan en la base UNION (tablas `PRPL*`), así el
+sistema en Fox puede cargar solicitudes ahí mismo y aparecen en la pestaña al instante.
+
+Mientras tanto la planilla se sigue llevando en Excel y se sube con «Subir planilla» cada vez
+que se quiera ver actualizada: reemplaza lo importado antes (no lo cargado desde Fox) y se ve
+quién la subió y cuándo. Si el archivo no se puede leer, avisa y quedan los datos que estaban.
+Los vendedores se unifican con el usuario del sistema (Kitu = Cristian, Mili/Miriam = Mirian,
+Negrucho = Alfredo...); los que no se sabe quién son aparecen como «(sin asignar)».
 
 Como la planilla tiene una hoja por mes, todo se puede mirar por mes: atajos (último mes,
 últimos 3, últimos 12, todo), tocar una barra del gráfico o una fila de la tabla «Mes a mes» para
