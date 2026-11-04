@@ -21,6 +21,7 @@ const bcraRoutes = require("./routes/bcra.routes");
 const chatRoutes = require("./routes/chat.routes");
 const conciliacionRoutes = require("./routes/conciliacion.routes");
 const ajustesRoutes = require("./routes/ajustes.routes");
+const prestamosRoutes = require("./routes/prestamos.routes");
 
 const app = express();
 
@@ -72,6 +73,7 @@ app.use("/api/conciliacion", requiereLogin, conciliacionRoutes);
 app.use("/api", requiereLogin, requiereAdmin, usuariosRoutes);
 app.use("/api", requiereLogin, requiereAdmin, faqAdminRoutes);
 app.use("/api", requiereLogin, requiereAdmin, estadisticasRoutes);
+app.use("/api", requiereLogin, requiereAdmin, prestamosRoutes);
 
 // Si CHAT_UPLOADS_DIR/PERFIL_UPLOADS_DIR es una ruta absoluta (por ejemplo
 // "F:\ChatMutual" para guardar los adjuntos en otro disco) se usa tal cual;
@@ -97,9 +99,13 @@ const CARPETA_UPLOADS_PERFILES = resolverCarpetaUploads("PERFIL_UPLOADS_DIR", "u
 fs.mkdirSync(CARPETA_UPLOADS_PERFILES, { recursive: true });
 app.use("/uploads/perfiles", requiereLogin, express.static(CARPETA_UPLOADS_PERFILES));
 
-// usuarios.html, faq-admin.html y proyectos.html son solo para admins. Se
-// definen ANTES del static middleware para interceptar el pedido y no
-// dejar que se sirva el archivo sin control.
+// usuarios.html, faq-admin.html, proyectos.html y prestamos.html son solo
+// para admins. Se definen ANTES del static middleware para interceptar el
+// pedido y no dejar que se sirva el archivo sin control.
+app.get("/prestamos.html", requiereLogin, requiereAdmin, (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "prestamos.html"));
+});
+
 app.get("/usuarios.html", requiereLogin, requiereAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "usuarios.html"));
 });

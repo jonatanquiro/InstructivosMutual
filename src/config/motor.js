@@ -50,13 +50,19 @@ function errorSegunSalida(codigo, errores) {
 // Si el lector detecta que la lectura no cierra, el JSON trae ok:false con el
 // mensaje para mostrar; eso NO es una excepción acá, lo decide quien llama.
 function ejecutarMotor(accion, opciones, timeoutMs = 5 * 60 * 1000) {
-  const args = [SCRIPT, accion];
+  return ejecutarScript(SCRIPT, [accion], opciones, timeoutMs);
+}
+
+// Lo mismo para otro script de motor/ (por ejemplo prestamos.py, que lee la
+// planilla de control de préstamos): mismos avisos si falta Python.
+function ejecutarScript(script, argumentos, opciones, timeoutMs) {
+  const args = [script, ...argumentos];
   for (const [clave, valor] of Object.entries(opciones)) {
     if (valor !== undefined && valor !== null) args.push(`--${clave}`, String(valor));
   }
 
   return new Promise((resolve, reject) => {
-    const proceso = spawn(PYTHON, args, { cwd: path.dirname(SCRIPT), windowsHide: true });
+    const proceso = spawn(PYTHON, args, { cwd: path.dirname(script), windowsHide: true });
     let salida = "";
     let errores = "";
     const reloj = setTimeout(() => {
@@ -88,4 +94,4 @@ function ejecutarMotor(accion, opciones, timeoutMs = 5 * 60 * 1000) {
   });
 }
 
-module.exports = { ejecutarMotor, ErrorMotor, CARPETA_BANCOS };
+module.exports = { ejecutarMotor, ejecutarScript, ErrorMotor, CARPETA_BANCOS, RAIZ };

@@ -228,6 +228,18 @@ lista de conversaciones (por sondeo o por los eventos de socket de arriba), así
 funciona con la pestaña de fondo. En el resto de las páginas, el mismo comportamiento (título +
 beep + badges) lo maneja `chat-flotante.js` — ver detalle en `src/public/` más abajo.
 
+## Control de préstamos
+
+- `motor/prestamos.py --archivo <xlsx>`: lee todas las hojas de `CONTROL PRÉSTAMOS.xlsx`
+  (busca en cada una la fila de encabezados que dice SOCIO, porque cambia de lugar; las filas
+  sin socio son totales al pie y se saltean), deduce `estado` y `motivos` del texto y devuelve
+  JSON. Las reglas de estado y motivos son las listas `MOTIVOS` / `_estado()` del mismo archivo.
+- `src/routes/prestamos.routes.js`: `GET /api/prestamos` (solo admin). Corre el script con
+  `ejecutarScript` de `config/motor.js` y cachea el resultado en memoria hasta que cambia la
+  fecha de modificación del Excel. Ruta del archivo: `PRESTAMOS_PLANILLA`.
+- `src/public/prestamos.html`: indicadores, gráficos (Chart.js), tabla por vendedor y detalle;
+  todo el filtrado es en el navegador.
+
 ## Conciliación bancaria
 
 Mayor contable de cada cuenta banco (PDF del sistema en FoxPro) contra el resumen del banco
@@ -478,6 +490,8 @@ alguien los edita a mano salvo `export-bd.json` que lo genera `exportar-bd.js`).
   que hay mensajes guardados**, quedarían ilegibles.
 - `CONC_CARPETA_BANCOS`, `CONC_PRIMER_PERIODO`, `PYTHON_PATH` (opcionales): conciliación bancaria,
   ver la sección de arriba.
+- `PRESTAMOS_PLANILLA` (opcional): ruta de `CONTROL PRÉSTAMOS.xlsx`; vacío =
+  `F:\Textos\CONTROL PRÉSTAMOS.xlsx`. Tiene que ser accesible desde el servidor.
 - `SESSION_COOKIE_NAME` / `CHAT_UPLOADS_DIR` / `PERFIL_UPLOADS_DIR` (opcionales, los dos
   últimos usados en `.env.test`): permiten correr una instancia de testeo en paralelo a
   producción sin pisar sesiones ni archivos subidos.

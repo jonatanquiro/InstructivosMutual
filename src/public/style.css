@@ -2839,3 +2839,48 @@ main.cb-main { max-width: 1200px; padding-bottom: 10rem; }
   .cb-par { grid-template-columns: 1fr; }
   .cb-columnas { grid-template-columns: 1fr; }
 }
+
+/* --- Control de préstamos (planilla CONTROL PRÉSTAMOS.xlsx) --- */
+
+.prest-origen { margin: 0 0 1rem; }
+.prest-buscar {
+  flex: 1;
+  min-width: 200px;
+  padding: 0.5rem 0.8rem;
+  border: 1px solid var(--borde);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  background: var(--bg);
+  color: var(--texto);
+}
+.tarjeta-stat.stat-texto-grande strong { color: var(--texto); }
+.prest-scroll { overflow-x: auto; }
+.prest-scroll .num, .prest-scroll th.num { text-align: right; white-space: nowrap; }
+.prest-scroll td { white-space: nowrap; }
+.prest-scroll td:nth-child(2), .prest-comentario { white-space: normal; }
+.prest-fila-vendedor { cursor: pointer; }
+.prest-fila-vendedor:hover { background: var(--verde-claro); }
+.prest-sub { font-size: 0.75rem; color: var(--texto-secundario); margin-top: 0.15rem; }
+.prest-comentario { min-width: 220px; max-width: 380px; }
+.prest-motivos { font-size: 0.75rem; color: #c22a20; margin-top: 0.2rem; }
+.prest-pastilla {
+  display: inline-block;
+  padding: 0.2rem 0.55rem;
+  border-radius: 16px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.prest-ok { background: #e3f5ec; color: #007a4a; }
+.prest-aprobado { background: #e2ecfa; color: #2a5fa8; }
+.prest-espera { background: #fbe9cc; color: #a1650c; }
+.prest-neutro { background: #eceef0; color: #5c636a; }
+.prest-desistio { background: #ece7f8; color: #5e48a3; }
+.prest-rechazado { background: #fbdcda; color: #c22a20; }
+:root[data-theme="oscuro"] .prest-ok { background: #123527; color: #5fd3a2; }
+:root[data-theme="oscuro"] .prest-aprobado { background: #1b2c45; color: #8db6ee; }
+:root[data-theme="oscuro"] .prest-espera { background: #3a2c12; color: #f0bd5e; }
+:root[data-theme="oscuro"] .prest-neutro { background: #2b3238; color: #b4bbc1; }
+:root[data-theme="oscuro"] .prest-desistio { background: #2c2541; color: #b9a8ec; }
+:root[data-theme="oscuro"] .prest-rechazado { background: #42201e; color: #f28b84; }
+:root[data-theme="oscuro"] .prest-motivos { color: #f28b84; }

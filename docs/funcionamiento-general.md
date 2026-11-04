@@ -157,6 +157,27 @@ reuniones de comisión directiva (pantalla completa, letra grande, sin controles
 Los datos salen de un data warehouse separado, actualizado por procesos aparte de esta app
 (esta app solo lee y muestra, no carga esos datos).
 
+## Control de Préstamos (solo admin)
+
+Muestra de otra forma la planilla que se lleva a mano en préstamos (`CONTROL PRÉSTAMOS.xlsx`,
+una hoja por mes): cuántas solicitudes entran por mes y cómo terminan, monto liquidado, motivos
+de rechazo, resultado por vendedor y el listado completo con filtros (meses, vendedor, estado,
+búsqueda por socio o comentario). La planilla se sigue cargando igual que siempre; la pestaña la
+vuelve a leer sola cada vez que alguien la guarda.
+
+La planilla no tiene una columna de estado, así que se deduce de lo escrito:
+
+- **Liquidado**: tiene fecha en FECHA DE LIQ. (o el comentario dice "liquidado").
+- **Rechazado**: el comentario (o la fecha de liq.) dice "rechazado".
+- **No lo tomó**: "no lo va a tomar", "no lo toma", "no se otorga", "no respondió".
+- **Aprobado sin liquidar**: dice "aprobado" pero todavía no tiene fecha de liquidación.
+- **Pide garantía**: "se pide una garantía" o similar, sin otra respuesta.
+- **Sin resolución**: nada de lo anterior (casi siempre, comentario vacío).
+
+El motivo de rechazo también sale del comentario por palabras clave (rojo / informado en otras
+entidades, mal historial de pago, judiciales, endeudamiento, sin antigüedad, no es socio...). Si
+algo aparece mal clasificado, lo más simple es escribir el comentario más claro en el Excel.
+
 ## Preguntas abiertas / pendientes de decisión
 
 Estos son puntos comentados pero todavía no resueltos, para no perderlos de vista:

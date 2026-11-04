@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Control de Préstamos — Información Mutual</title>
+  <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
+  <script>
+    (function () {
+      var t = localStorage.getItem("tema");
+      if (t) document.documentElement.setAttribute("data-theme", t);
+    })();
+  </script>
+  <link rel="stylesheet" href="/style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.1/chart.umd.min.js"></script>
+</head>
+<body>
+  <header class="barra">
+    <div class="barra-izq">
+      <img src="/img/logo-blanco.png" alt="Logo Mutual" class="logo-barra" />
+      <h1>Control de Préstamos</h1>
+      <span class="saludo" id="saludo"></span>
+    </div>
+  </header>
+
+  <main class="main-proyectos">
+    <p class="nota-grafico prest-origen" id="origen">Leyendo la planilla…</p>
+    <div class="error" id="errorCarga"></div>
+
+    <div id="contenido" hidden>
+      <div class="filtros-proyectos">
+        <label for="filtroDesde">Desde</label>
+        <select id="filtroDesde"></select>
+        <label for="filtroHasta">Hasta</label>
+        <select id="filtroHasta"></select>
+        <label for="filtroVendedor">Vendedor</label>
+        <select id="filtroVendedor"></select>
+        <label for="filtroEstado">Estado</label>
+        <select id="filtroEstado"></select>
+        <input type="search" id="filtroSocio" class="prest-buscar" placeholder="Buscar socio o comentario…" />
+      </div>
+
+      <div class="grilla-resumen" id="kpis"></div>
+
+      <div class="caja-grafico">
+        <h2>Solicitudes por mes, según cómo terminaron</h2>
+        <canvas id="graficoMeses" height="110"></canvas>
+      </div>
+
+      <div class="grilla-2col">
+        <div class="caja-grafico">
+          <h2>Monto liquidado por mes</h2>
+          <canvas id="graficoMonto"></canvas>
+        </div>
+        <div class="caja-grafico">
+          <h2>Motivos de rechazo</h2>
+          <p class="nota-grafico">Sale de lo escrito en Comentarios. Un rechazo puede tener más de un motivo.</p>
+          <canvas id="graficoMotivos"></canvas>
+        </div>
+      </div>
+
+      <h3 class="titulo-seccion">Por vendedor</h3>
+      <div class="caja-grafico">
+        <canvas id="graficoVendedores"></canvas>
+      </div>
+      <p class="nota-grafico">Tocá un vendedor en la tabla para ver sólo lo suyo.</p>
+      <div class="tabla-detalle prest-scroll" id="tablaVendedores"></div>
+
+      <h3 class="titulo-seccion">Solicitudes <span id="cantidadDetalle"></span></h3>
+      <div class="tabla-detalle prest-scroll" id="tablaDetalle"></div>
+    </div>
+  </main>
+
+  <footer class="barra-inferior">
+    <a href="/" class="btn-inferior principal">◂ Menú</a>
+    <button id="btnSalir" class="btn-inferior peligro">Cerrar sesión</button>
+  </footer>
+
+  <script src="/comun.js"></script>
+  <script>
+    // Orden en que se apilan y se listan. El estado no está en una columna de la
+    // planilla: lo deduce motor/prestamos.py de Comentarios y Fecha de liq.
+    const ESTADOS = [
+      { nombre: "Liquidado", color: "#00915a", clase: "ok" },
+      { nombre: "Aprobado sin liquidar", color: "#3b7dd8", clase: "aprobado" },
+      { nombre: "Pide garantía", color: "#d9930d", clase: "espera" },
+      { nombre: "Sin resolución", color: "#9aa1a7", clase: "neutro" },
+      { nombre: "No lo tomó", color: "#8a6fd1", clase: "desistio" },
+      { nombre: "Rechazado", color: "#e0483f", clase: "rechazado" },
+    ];
+    const MESES_CORTOS = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"];
+    const graficos = {};
+    let solicitudes = [];
+    let periodos = [];
+
+    function escapar(texto) {
+      return String(texto ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+    }
+
+    function moneda(numero) {
+      return Number(numero || 0).toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
+    }
+
+    // Montos grandes abreviados para ejes y tarjetas: "$ 12,5 M".
+    function monedaCorta(numero) {
+      if (Math.abs(numero) >= 1e6) return "$ " + (numero / 1e6).toLocaleString("es-AR", { maximumFractionDigits: 1 }) + " M";
+      if (Math.abs(numero) >= 1e3) return "$ " + Math.round(numero / 1e3).toLocaleString("es-AR") + " mil";
+      return moneda(numero);
+    }
+
+    function etiquetaPeriodo(periodo) {
+      const [anio, mes] = periodo.split("-");
+      return `${MESES_CORTOS[Number(mes) - 1]} ${anio}`;
+    }
+
+    function fechaCorta(iso) {
+      if (!iso) return "";
+      const [a, m, d] = iso.split("-");
+      return `${d}/${m}/${a.slice(2)}`;
+    }
+
+    function porcentaje(parte, total) {
+      return total ? Math.round((parte / total) * 100) + "%" : "—";
+    }
+
+    function colorCss(variable) {
+      return getComputedStyle(document.documentElement).getPropertyValue(variable).trim();
+    }
+
+    function dibujar(id, config) {
+      if (graficos[id]) graficos[id].destroy();
+      const texto = colorCss("--texto-secundario");
+      const grilla = colorCss("--borde");
+      const ejes = config.options?.scales || {};
+      for (const eje of Object.values(ejes)) {
+        eje.ticks = { color: texto, ...eje.ticks };
+        eje.grid = { color: grilla, ...eje.grid };
+      }
+      config.options = {
+        responsive: true,
+        ...config.options,
+        plugins: { legend: { labels: { color: colorCss("--texto"), boxWidth: 12 } }, ...config.options?.plugins },
+      };
+      graficos[id] = new Chart(document.getElementById(id), config);
+    }
+
+    function pastilla(estado) {
+      const e = ESTADOS.find((x) => x.nombre === estado);
+      return `<span class="prest-pastilla prest-${e ? e.clase : "neutro"}">${escapar(estado)}</span>`;
+    }
+
+    // --- Filtros ---
+
+    function filtradas() {
+      const desde = document.getElementById("filtroDesde").value;
+      const hasta = document.getElementById("filtroHasta").value;
+      const vendedor = document.getElementById("filtroVendedor").value;
+      const estado = document.getElementById("filtroEstado").value;
+      const busqueda = document.getElementById("filtroSocio").value.trim().toLowerCase();
+      return solicitudes.filter(
+        (s) =>
+          s.periodo >= desde &&
+          s.periodo <= hasta &&
+          (!vendedor || s.vendedor === vendedor) &&
+          (!estado || (estado === "__curso" ? ["Aprobado sin liquidar", "Pide garantía", "Sin resolución"].includes(s.estado) : s.estado === estado)) &&
+          (!busqueda || `${s.socio} ${s.conyuge} ${s.garantia} ${s.comentarios}`.toLowerCase().includes(busqueda))
+      );
+    }
+
+    function prepararFiltros() {
+      periodos = [...new Set(solicitudes.map((s) => s.periodo).filter(Boolean))].sort();
+      const opcionesPeriodo = periodos.map((p) => `<option value="${p}">${etiquetaPeriodo(p)}</option>`).join("");
+      const desde = document.getElementById("filtroDesde");
+      const hasta = document.getElementById("filtroHasta");
+      desde.innerHTML = opcionesPeriodo;
+      hasta.innerHTML = opcionesPeriodo;
+      // Por defecto, los últimos 12 meses de la planilla.
+      desde.value = periodos[Math.max(0, periodos.length - 12)];
+      hasta.value = periodos[periodos.length - 1];
+
+      const cantidadPorVendedor = new Map();
+      for (const s of solicitudes) cantidadPorVendedor.set(s.vendedor, (cantidadPorVendedor.get(s.vendedor) || 0) + 1);
+      const vendedores = [...cantidadPorVendedor.keys()].sort((a, b) => a.localeCompare(b, "es"));
+      document.getElementById("filtroVendedor").innerHTML =
+        '<option value="">Todos</option>' + vendedores.map((v) => `<option>${escapar(v)}</option>`).join("");
+
+      document.getElementById("filtroEstado").innerHTML =
+        '<option value="">Todos</option><option value="__curso">En curso (sin cerrar)</option>' +
+        ESTADOS.map((e) => `<option>${e.nombre}</option>`).join("");
+
+      for (const id of ["filtroDesde", "filtroHasta", "filtroVendedor", "filtroEstado"]) {
+        document.getElementById(id).addEventListener("change", pintar);
+      }
+      let espera;
+      document.getElementById("filtroSocio").addEventListener("input", () => {
+        clearTimeout(espera);
+        espera = setTimeout(pintar, 200);
+      });
+    }
+
+    // --- Pintado ---
+
+    function contar(lista, estado) {
+      return lista.filter((s) => s.estado === estado).length;
+    }
+
+    function pintarKpis(lista) {
+      const liquidados = lista.filter((s) => s.estado === "Liquidado");
+      const montoLiquidado = liquidados.reduce((acc, s) => acc + (s.importe || 0), 0);
+      const aprobados = liquidados.length + contar(lista, "Aprobado sin liquidar") + contar(lista, "No lo tomó");
+      const rechazados = contar(lista, "Rechazado");
+      const enCurso = contar(lista, "Aprobado sin liquidar") + contar(lista, "Pide garantía") + contar(lista, "Sin resolución");
+      const tarjetas = [
+        { valor: lista.length, etiqueta: "Solicitudes", clase: "stat-texto-grande" },
+        { valor: liquidados.length, etiqueta: "Liquidados", clase: "stat-verde" },
+        { valor: rechazados, etiqueta: "Rechazados", clase: "stat-rojo" },
+        { valor: enCurso, etiqueta: "En curso (sin cerrar)", clase: "stat-texto-grande" },
+        // Aprobados sobre los que tuvieron respuesta (aprobado o rechazado).
+        { valor: porcentaje(aprobados, aprobados + rechazados), etiqueta: "Aprobación (de los resueltos)", clase: "stat-texto-grande" },
+        { valor: monedaCorta(montoLiquidado), etiqueta: "Monto liquidado", clase: "stat-verde" },
+        { valor: liquidados.length ? monedaCorta(montoLiquidado / liquidados.length) : "—", etiqueta: "Promedio por préstamo", clase: "stat-texto-grande" },
+      ];
+      document.getElementById("kpis").innerHTML = tarjetas
+        .map((t) => `<div class="tarjeta-stat ${t.clase}"><strong>${t.valor}</strong><span>${t.etiqueta}</span></div>`)
+        .join("");
+    }
+
+    function mesesDelRango() {
+      const desde = document.getElementById("filtroDesde").value;
+      const hasta = document.getElementById("filtroHasta").value;
+      return periodos.filter((p) => p >= desde && p <= hasta);
+    }
+
+    function pintarGraficoMeses(lista) {
+      const meses = mesesDelRango();
+      dibujar("graficoMeses", {
+        type: "bar",
+        data: {
+          labels: meses.map(etiquetaPeriodo),
+          datasets: ESTADOS.map((e) => ({
+            label: e.nombre,
+            backgroundColor: e.color,
+            borderColor: colorCss("--superficie"),
+            borderWidth: { top: 2 },
+            borderRadius: 3,
+            data: meses.map((m) => lista.filter((s) => s.periodo === m && s.estado === e.nombre).length),
+          })),
+        },
+        options: {
+          interaction: { mode: "index", intersect: false },
+          scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } } },
+        },
+      });
+    }
+
+    function pintarGraficoMonto(lista) {
+      const meses = mesesDelRango();
+      dibujar("graficoMonto", {
+        type: "bar",
+        data: {
+          labels: meses.map(etiquetaPeriodo),
+          datasets: [{
+            label: "Monto liquidado",
+            backgroundColor: "#00915a",
+            borderRadius: 4,
+            data: meses.map((m) => lista.filter((s) => s.periodo === m && s.estado === "Liquidado").reduce((a, s) => a + (s.importe || 0), 0)),
+          }],
+        },
+        options: {
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => moneda(c.raw) } } },
+          scales: { x: { grid: { display: false } }, y: { beginAtZero: true, ticks: { callback: (v) => monedaCorta(v) } } },
+        },
+      });
+    }
+
+    function pintarGraficoMotivos(lista) {
+      const cuenta = new Map();
+      for (const s of lista) for (const m of s.motivos || []) cuenta.set(m, (cuenta.get(m) || 0) + 1);
+      const orden = [...cuenta.entries()].sort((a, b) => b[1] - a[1]);
+      dibujar("graficoMotivos", {
+        type: "bar",
+        data: {
+          labels: orden.map(([m]) => m),
+          datasets: [{ label: "Rechazos", backgroundColor: "#e0483f", borderRadius: 4, data: orden.map(([, n]) => n) }],
+        },
+        options: {
+          indexAxis: "y",
+          plugins: { legend: { display: false } },
+          scales: { x: { beginAtZero: true, ticks: { precision: 0 } }, y: { grid: { display: false } } },
+        },
+      });
+    }
+
+    function resumenPorVendedor(lista) {
+      const mapa = new Map();
+      for (const s of lista) {
+        if (!mapa.has(s.vendedor)) mapa.set(s.vendedor, { vendedor: s.vendedor, total: 0, monto: 0, estados: {} });
+        const v = mapa.get(s.vendedor);
+        v.total++;
+        v.estados[s.estado] = (v.estados[s.estado] || 0) + 1;
+        if (s.estado === "Liquidado") v.monto += s.importe || 0;
+      }
+      return [...mapa.values()].sort((a, b) => b.total - a.total);
+    }
+
+    function pintarVendedores(lista) {
+      const resumen = resumenPorVendedor(lista);
+      const lienzo = document.getElementById("graficoVendedores");
+      lienzo.height = Math.max(120, resumen.length * 26 + 60);
+      dibujar("graficoVendedores", {
+        type: "bar",
+        data: {
+          labels: resumen.map((v) => v.vendedor),
+          datasets: ESTADOS.map((e) => ({
+            label: e.nombre,
+            backgroundColor: e.color,
+            borderColor: colorCss("--superficie"),
+            borderWidth: { right: 2 },
+            data: resumen.map((v) => v.estados[e.nombre] || 0),
+          })),
+        },
+        options: {
+          indexAxis: "y",
+          maintainAspectRatio: false,
+          interaction: { mode: "index", intersect: false },
+          scales: { x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }, y: { stacked: true, grid: { display: false } } },
+        },
+      });
+
+      const filas = resumen
+        .map((v) => {
+          const liq = v.estados["Liquidado"] || 0;
+          const rech = v.estados["Rechazado"] || 0;
+          const aprob = liq + (v.estados["Aprobado sin liquidar"] || 0) + (v.estados["No lo tomó"] || 0);
+          return `
+            <tr class="prest-fila-vendedor" data-vendedor="${escapar(v.vendedor)}">
+              <td><strong>${escapar(v.vendedor)}</strong></td>
+              <td class="num">${v.total}</td>
+              <td class="num">${liq}</td>
+              <td class="num">${rech}</td>
+              <td class="num">${porcentaje(aprob, aprob + rech)}</td>
+              <td class="num">${moneda(v.monto)}</td>
+              <td class="num">${liq ? moneda(v.monto / liq) : "—"}</td>
+            </tr>`;
+        })
+        .join("");
+      const contenedor = document.getElementById("tablaVendedores");
+      contenedor.innerHTML = resumen.length
+        ? `<table class="tabla-usuarios"><thead><tr>
+            <th>Vendedor</th><th class="num">Solicitudes</th><th class="num">Liquidados</th><th class="num">Rechazados</th>
+            <th class="num">Aprobación</th><th class="num">Monto liquidado</th><th class="num">Promedio</th>
+          </tr></thead><tbody>${filas}</tbody></table>`
+        : '<div class="sin-resultados">Sin solicitudes para este filtro.</div>';
+      for (const fila of contenedor.querySelectorAll(".prest-fila-vendedor")) {
+        fila.addEventListener("click", () => {
+          const select = document.getElementById("filtroVendedor");
+          select.value = select.value === fila.dataset.vendedor ? "" : fila.dataset.vendedor;
+          pintar();
+        });
+      }
+    }
+
+    function pintarDetalle(lista) {
+      const orden = [...lista].sort((a, b) => (b.fecha || b.periodo || "").localeCompare(a.fecha || a.periodo || ""));
+      document.getElementById("cantidadDetalle").textContent = `(${orden.length})`;
+      const filas = orden
+        .map((s) => {
+          const extra = [s.conyuge && `Cónyuge: ${s.conyuge}`, s.garantia && `Garantía: ${s.garantia}`].filter(Boolean);
+          const motivos = s.motivos?.length ? `<div class="prest-motivos">${s.motivos.map(escapar).join(" · ")}</div>` : "";
+          return `
+            <tr>
+              <td>${fechaCorta(s.fecha) || etiquetaPeriodo(s.periodo)}</td>
+              <td><strong>${escapar(s.socio)}</strong>${extra.length ? `<div class="prest-sub">${escapar(extra.join(" · "))}</div>` : ""}</td>
+              <td class="num">${s.importe != null ? moneda(s.importe) : "—"}</td>
+              <td>${escapar(s.plazo)}</td>
+              <td>${escapar(s.vendedor)}</td>
+              <td>${pastilla(s.estado)}${s.fechaLiq ? `<div class="prest-sub">Liq. ${fechaCorta(s.fechaLiq)}</div>` : ""}</td>
+              <td>${escapar(s.formaPago)}</td>
+              <td class="prest-comentario">${escapar(s.comentarios)}${motivos}</td>
+            </tr>`;
+        })
+        .join("");
+      document.getElementById("tablaDetalle").innerHTML = orden.length
+        ? `<table class="tabla-usuarios"><thead><tr>
+            <th>Fecha</th><th>Socio</th><th class="num">Importe</th><th>Plazo</th><th>Vendedor</th>
+            <th>Estado</th><th>Forma de pago</th><th>Comentarios</th>
+          </tr></thead><tbody>${filas}</tbody></table>`
+        : '<div class="sin-resultados">Sin solicitudes para este filtro.</div>';
+    }
+
+    function pintar() {
+      const lista = filtradas();
+      pintarKpis(lista);
+      pintarGraficoMeses(lista);
+      pintarGraficoMonto(lista);
+      pintarGraficoMotivos(lista);
+      pintarVendedores(lista);
+      pintarDetalle(lista);
+    }
+
+    async function cargar() {
+      const origen = document.getElementById("origen");
+      const error = document.getElementById("errorCarga");
+      try {
+        const respuesta = await fetch("/api/prestamos");
+        if (respuesta.status === 401) {
+          window.location.href = "/login.html";
+          return;
+        }
+        const datos = await respuesta.json();
+        if (!respuesta.ok) {
+          origen.textContent = "";
+          error.textContent = datos.error || "No se pudo leer la planilla.";
+          return;
+        }
+        solicitudes = datos.solicitudes.filter((s) => s.periodo);
+        const actualizado = new Date(datos.actualizado).toLocaleString("es-AR", { dateStyle: "short", timeStyle: "short" });
+        origen.textContent = `Datos de «${datos.archivo}» (${datos.hojas.length} hojas mensuales), guardada por última vez el ${actualizado}. ` +
+          "El estado y el motivo de rechazo se deducen de lo escrito en Comentarios y Fecha de liq.";
+        prepararFiltros();
+        document.getElementById("contenido").hidden = false;
+        pintar();
+      } catch (e) {
+        origen.textContent = "";
+        error.textContent = "No se pudo conectar con el servidor.";
+      }
+    }
+
+    cargar();
+  </script>
+</body>
+</html>
