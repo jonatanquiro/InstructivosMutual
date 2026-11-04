@@ -162,8 +162,15 @@ Los datos salen de un data warehouse separado, actualizado por procesos aparte d
 Muestra de otra forma la planilla que se lleva a mano en préstamos (`CONTROL PRÉSTAMOS.xlsx`,
 una hoja por mes): cuántas solicitudes entran por mes y cómo terminan, monto liquidado, motivos
 de rechazo, resultado por vendedor y el listado completo con filtros (meses, vendedor, estado,
-búsqueda por socio o comentario). La planilla se sigue cargando igual que siempre; la pestaña la
-vuelve a leer sola cada vez que alguien la guarda.
+búsqueda por socio o comentario). La planilla se sigue llevando igual que siempre en Excel y se
+sube desde la pestaña con «Subir planilla» cada vez que se quiera ver actualizada: reemplaza a la
+anterior (que queda como respaldo) y se ve quién la subió y cuándo. Si el archivo no se puede
+leer, avisa y queda la que estaba.
+
+Como la planilla tiene una hoja por mes, todo se puede mirar por mes: atajos (último mes,
+últimos 3, últimos 12, todo), tocar una barra del gráfico o una fila de la tabla «Mes a mes» para
+quedarse con ese mes, y «Comparar dos meses» con las diferencias (en verde lo que mejoró, en rojo
+lo que empeoró) y el detalle por vendedor. Por defecto compara los dos últimos meses cerrados.
 
 La planilla no tiene una columna de estado, así que se deduce de lo escrito:
 

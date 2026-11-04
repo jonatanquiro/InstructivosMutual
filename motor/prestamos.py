@@ -18,11 +18,13 @@ import json
 import re
 import sys
 import unicodedata
+import zipfile
 from collections import Counter
 from datetime import date, datetime, time
 from pathlib import Path
 
 import openpyxl
+from openpyxl.utils.exceptions import InvalidFileException
 
 MESES = {'ENERO': 1, 'FEBRERO': 2, 'MARZO': 3, 'ABRIL': 4, 'MAYO': 5, 'JUNIO': 6, 'JULIO': 7,
          'AGOSTO': 8, 'SEPTIEMBRE': 9, 'SETIEMBRE': 9, 'OCTUBRE': 10, 'NOVIEMBRE': 11, 'DICIEMBRE': 12}
@@ -239,6 +241,9 @@ def main():
         try:
             hojas, solicitudes = leer(archivo)
             resultado = {'ok': True, 'hojas': hojas, 'solicitudes': solicitudes}
+        except (zipfile.BadZipFile, InvalidFileException):
+            resultado = {'ok': False, 'error': 'El archivo no es una planilla .xlsx válida. Si es un .xls viejo, '
+                                               'abrila en Excel y guardala como .xlsx.'}
         except PermissionError:
             resultado = {'ok': False, 'error': 'No se pudo abrir la planilla (¿sin permiso de lectura?).'}
         except Exception as error:  # planilla rota o con un formato inesperado

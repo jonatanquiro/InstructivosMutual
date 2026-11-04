@@ -2856,10 +2856,12 @@ main.cb-main { max-width: 1200px; padding-bottom: 10rem; }
 .tarjeta-stat.stat-texto-grande strong { color: var(--texto); }
 .prest-scroll { overflow-x: auto; }
 .prest-scroll .num, .prest-scroll th.num { text-align: right; white-space: nowrap; }
-.prest-scroll td { white-space: nowrap; }
-.prest-scroll td:nth-child(2), .prest-comentario { white-space: normal; }
-.prest-fila-vendedor { cursor: pointer; }
-.prest-fila-vendedor:hover { background: var(--verde-claro); }
+.prest-scroll .nw { white-space: nowrap; }
+.prest-socio { min-width: 170px; }
+.prest-kpis { grid-template-columns: repeat(auto-fit, minmax(125px, 1fr)); }
+.prest-kpis .tarjeta-stat strong { font-size: 1.35rem; white-space: nowrap; }
+.prest-fila-click { cursor: pointer; }
+.prest-fila-click:hover, .prest-fila-activa { background: var(--verde-claro); }
 .prest-sub { font-size: 0.75rem; color: var(--texto-secundario); margin-top: 0.15rem; }
 .prest-comentario { min-width: 220px; max-width: 380px; }
 .prest-motivos { font-size: 0.75rem; color: #c22a20; margin-top: 0.2rem; }
@@ -2884,3 +2886,24 @@ main.cb-main { max-width: 1200px; padding-bottom: 10rem; }
 :root[data-theme="oscuro"] .prest-desistio { background: #2c2541; color: #b9a8ec; }
 :root[data-theme="oscuro"] .prest-rechazado { background: #42201e; color: #f28b84; }
 :root[data-theme="oscuro"] .prest-motivos { color: #f28b84; }
+.prest-planilla {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1rem;
+  padding: 0.8rem 1.1rem;
+  background: var(--superficie);
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  font-size: 0.88rem;
+}
+.prest-btn-subir { margin: 0; padding: 0.45rem 0.9rem; font-size: 0.85rem; }
+.prest-subiendo { opacity: 0.5; pointer-events: none; }
+.prest-volver { margin-top: 0.6rem; }
+.prest-comparar { align-items: start; }
+.prest-comparar .tabla-usuarios { margin: 0; }
+.prest-dif-bien { color: var(--verde); font-weight: 600; }
+.prest-dif-mal { color: #c22a20; font-weight: 600; }
+:root[data-theme="oscuro"] .prest-dif-mal { color: #f28b84; }
