@@ -246,8 +246,13 @@ beep + badges) lo maneja `chat-flotante.js` — ver detalle en `src/public/` má
   como respaldo en `PRESTAMOS_CARPETA` (`planilla.xlsx` / `planilla-anterior.xlsx`; quién y
   cuándo, en `planilla.json`). `GET /api/prestamos` lee de UNION en cada pedido, sin caché, así
   aparece al instante lo cargado desde Fox (`{ sinPlanilla: true }` si la tabla está vacía).
-- `src/public/prestamos.html`: indicadores, gráficos (Chart.js), mes a mes, comparación de dos
-  meses, por vendedor y detalle; todo el filtrado es en el navegador.
+- La pantalla es el módulo **Estado de Préstamos** de `src/public/proyectos.html` (funciones
+  `prest*` y `dibujarEstadoPrestamos`): indicadores, gráficos (Chart.js), mes a mes, comparación
+  de dos meses, por sucursal, por vendedor y detalle; todo el filtrado es en el navegador. Usa el
+  filtro de sucursales de Proyectos (mismos IDs que `src/config/sucursales.js`) y cambia el rango
+  de Desde/Hasta por los meses con solicitudes (`usarRango`; los demás módulos vuelven al del DW).
+  `/prestamos.html` redirige a `/proyectos.html#estado-prestamos`. El listado de solicitudes no
+  tiene `.tabla-detalle` a propósito, para que no entre entero en el PDF.
 
 ### Tablas en UNION (para la pantalla en Fox)
 
@@ -256,7 +261,11 @@ beep + badges) lo maneja `chat-flotante.js` — ver detalle en `src/public/` má
   `PLPLAZO` (meses; si son días, `PLPLAZOTX`), `PLVENDEDOR` (`Usuarios.id`), `PLESTADO` y
   `USUAPLIC`. `PLORIGEN` queda en `'FOX'` por defecto: **no usar `'EXCEL'`**, que es lo que
   se borra y reinserta en cada subida de la planilla. Opcionales: `PLSONUME` (nº de socio),
-  `PLCONYUGE`, `PLGARANTE`, `PLFECLIQ`, `PLFORMAPAG`, `PLCOMENT`, `PLENVARCH`.
+  `PLCONYUGE`, `PLGARANTE`, `PLFECLIQ`, `PLFORMAPAG`, `PLCOMENT`, `PLENVARCH`, `PLSUCURSAL`
+  (`oApp.sucursal`: 0 Sunchales, 1 Rafaela, 2 Humberto, 3 Moisés Ville; por defecto 0).
+- Desde Fox se graba con los SP `sp_s_/sp_i_/sp_u_/sp_d_prplanilla` (y `sp_s_prplestados`,
+  `sp_s_prplmotivos`, `sp_s_prplvendedores` para los combos), que están fuera de este repo junto
+  con el generador de `estado_prestamos.scx` (carpeta `FoxPrestamos`). Ya están creados en UNION.
 - Al **modificar** una fila (sea de Fox o importada del Excel), completar `USUMODIF` y
   `ULTMODIF`: así una próxima subida de la planilla no pisa la corrección.
 - `PRPLESTADO` (combo de estado; `ESCERRADO = 0` son los "en curso"), `PRPLMOTIVO` y

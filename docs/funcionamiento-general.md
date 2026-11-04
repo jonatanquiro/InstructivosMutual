@@ -157,24 +157,42 @@ reuniones de comisión directiva (pantalla completa, letra grande, sin controles
 Los datos salen de un data warehouse separado, actualizado por procesos aparte de esta app
 (esta app solo lee y muestra, no carga esos datos).
 
-## Control de Préstamos (solo admin)
+## Estado de Préstamos (módulo de Proyectos)
 
-Muestra de otra forma la planilla que se lleva a mano en préstamos (`CONTROL PRÉSTAMOS.xlsx`,
-una hoja por mes): cuántas solicitudes entran por mes y cómo terminan, monto liquidado, motivos
-de rechazo, resultado por vendedor y el listado completo con filtros (meses, vendedor, estado,
-búsqueda por socio o comentario). Los datos se guardan en la base UNION (tablas `PRPL*`), así el
-sistema en Fox puede cargar solicitudes ahí mismo y aparecen en la pestaña al instante.
+Es un módulo más de **Proyectos** («Estado de Préstamos»). Muestra las solicitudes de préstamo
+que se cargan desde Fox (pantalla `estado_prestamos.scx`): cuántas entran por mes y en qué
+terminan, cuántas se aprueban, monto liquidado, por qué se rechazan, resultado por sucursal y
+por vendedor, y el listado completo. Los datos están en la base UNION (tablas `PRPL*`) y se leen
+cada vez que se abre, así aparece al instante lo cargado en Fox.
 
-La planilla de Excel ya no se usa: se importó una sola vez (1.085 solicitudes, oct 2024 a nov
-2026) y de ahora en más se carga desde Fox. Los vendedores se unifican con el usuario del sistema (Kitu = Cristian, Mili/Miriam = Mirian,
-Negrucho = Alfredo...); los que no se sabe quién son aparecen como «(sin asignar)».
+Se filtra como el resto de Proyectos: sucursales (tildándolas), rango de meses y atajos, más
+vendedor, estado y búsqueda por socio o comentario. Tocar una barra de «Solicitudes por mes» o
+una fila de «Mes a mes» deja sólo ese mes; «Comparar dos meses» muestra las diferencias (en verde
+lo que mejoró, en rojo lo que empeoró) y el detalle por vendedor. Por defecto compara los dos
+últimos meses cerrados. Los meses de Desde/Hasta son los que tienen solicitudes (no los del data
+warehouse, como el resto de los módulos).
 
-Como la planilla tiene una hoja por mes, todo se puede mirar por mes: atajos (último mes,
-últimos 3, últimos 12, todo), tocar una barra del gráfico o una fila de la tabla «Mes a mes» para
-quedarse con ese mes, y «Comparar dos meses» con las diferencias (en verde lo que mejoró, en rojo
-lo que empeoró) y el detalle por vendedor. Por defecto compara los dos últimos meses cerrados.
+Para leer los gráficos:
 
-La planilla no tiene una columna de estado, así que se deduce de lo escrito:
+- **Solicitudes por mes**: cada barra es lo que entró en el mes, partida en Liquidado, No lo tomó,
+  Rechazado y En curso (aprobado sin liquidar, pide garantía o sin resolución).
+- **Qué pasó con las solicitudes**: de las que entraron, cuántas tuvieron respuesta, cuántas se
+  aprobaron y cuántas se liquidaron.
+- **Aprobación por mes**: de las que tuvieron respuesta, qué porcentaje se aprobó (una línea por
+  sucursal).
+- **Por qué se rechazan**: cada barra dice en cuántos de los rechazos aparece ese motivo, sobre el
+  total de rechazos. Un rechazo puede tener más de un motivo, así que las barras **no** suman la
+  cantidad de rechazos.
+
+Sucursales: 0 Sunchales (Casa Central), 1 Rafaela, 2 Humberto, 3 Moisés Ville. Lo importado del
+Excel es todo de Sunchales.
+
+La planilla de Excel (`CONTROL PRÉSTAMOS.xlsx`) ya no se usa: se importó una sola vez (1.085
+solicitudes, oct 2024 a nov 2026) y de ahora en más se carga desde Fox. Los vendedores se
+unifican con el usuario del sistema (Kitu = Cristian, Mili/Miriam = Mirian, Negrucho =
+Alfredo...); los que no se sabe quién son aparecen como «(sin asignar)».
+
+Lo importado del Excel no tenía una columna de estado, así que se dedujo de lo escrito:
 
 - **Liquidado**: tiene fecha en FECHA DE LIQ. (o el comentario dice "liquidado").
 - **Rechazado**: el comentario (o la fecha de liq.) dice "rechazado".
@@ -185,7 +203,7 @@ La planilla no tiene una columna de estado, así que se deduce de lo escrito:
 
 El motivo de rechazo también sale del comentario por palabras clave (rojo / informado en otras
 entidades, mal historial de pago, judiciales, endeudamiento, sin antigüedad, no es socio...). Si
-algo aparece mal clasificado, lo más simple es escribir el comentario más claro en el Excel.
+algo quedó mal clasificado, se corrige desde la pantalla de Fox.
 
 ## Preguntas abiertas / pendientes de decisión
 

@@ -103,11 +103,12 @@ function nombrePropio(texto) {
   return texto.toLowerCase().replace(/(^|\s)\S/g, (l) => l.toUpperCase());
 }
 
-// Todas las solicitudes, con la misma forma que espera prestamos.html.
+// Todas las solicitudes, con la forma que espera el módulo Estado de
+// Préstamos de proyectos.html.
 async function leerSolicitudes(pool) {
   const { recordset } = await pool.request().query(`
     SELECT p.ID, p.PLFECHA, p.PLANIO, p.PLMES, p.PLSOCIO, p.PLCONYUGE, p.PLGARANTE, p.PLIMPORTE, p.PLPLAZO,
-           p.PLPLAZOTX, p.PLFECLIQ, p.PLFORMAPAG, p.PLVENDTXT, p.PLCOMENT, p.PLENVARCH, p.PLORIGEN,
+           p.PLPLAZOTX, p.PLFECLIQ, p.PLFORMAPAG, p.PLVENDTXT, p.PLCOMENT, p.PLENVARCH, p.PLORIGEN, p.PLSUCURSAL,
            e.ESNOMBRE, u.nombrecomp,
            (SELECT STRING_AGG(m.MONOMBRE, '|') FROM ${U}PRPLSOLMOT sm
               JOIN ${U}PRPLMOTIVO m ON m.ID = sm.IDMOTIVO WHERE sm.IDPLANILLA = p.ID) AS motivos
@@ -119,6 +120,7 @@ async function leerSolicitudes(pool) {
     id: r.ID,
     fecha: fechaIso(r.PLFECHA),
     periodo: `${r.PLANIO}-${String(r.PLMES).padStart(2, "0")}`,
+    sucursal: r.PLSUCURSAL, // mismos números que src/config/sucursales.js
     socio: r.PLSOCIO,
     conyuge: r.PLCONYUGE || "",
     garantia: r.PLGARANTE || "",

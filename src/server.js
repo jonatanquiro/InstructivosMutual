@@ -99,12 +99,12 @@ const CARPETA_UPLOADS_PERFILES = resolverCarpetaUploads("PERFIL_UPLOADS_DIR", "u
 fs.mkdirSync(CARPETA_UPLOADS_PERFILES, { recursive: true });
 app.use("/uploads/perfiles", requiereLogin, express.static(CARPETA_UPLOADS_PERFILES));
 
-// usuarios.html, faq-admin.html, proyectos.html y prestamos.html son solo
-// para admins. Se definen ANTES del static middleware para interceptar el
-// pedido y no dejar que se sirva el archivo sin control.
-app.get("/prestamos.html", requiereLogin, requiereAdmin, (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "prestamos.html"));
-});
+// usuarios.html, faq-admin.html y proyectos.html son solo para admins. Se
+// definen ANTES del static middleware para interceptar el pedido y no dejar
+// que se sirva el archivo sin control.
+
+// El control de préstamos pasó a ser un módulo de Proyectos.
+app.get("/prestamos.html", (req, res) => res.redirect("/proyectos.html#estado-prestamos"));
 
 app.get("/usuarios.html", requiereLogin, requiereAdmin, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "usuarios.html"));

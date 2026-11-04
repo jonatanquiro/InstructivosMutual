@@ -12,6 +12,8 @@
 --   PRPLANILLA  una fila por solicitud
 --   PRPLSOLMOT  motivos de cada solicitud rechazada (puede tener varios)
 --   PRPLVENALI  cómo se escribió el vendedor en la planilla -> Usuarios.id
+--
+-- PLSUCURSAL se agregó después (ALTER más abajo).
 USE [UNION];
 GO
 
@@ -85,6 +87,14 @@ GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'IX_PRPLANILLA_PERIODO')
     CREATE INDEX IX_PRPLANILLA_PERIODO ON dbo.PRPLANILLA (PLANIO, PLMES);
+GO
+
+-- Sucursal que tomó la solicitud (oApp.sucursal en Fox): 0 Sunchales (Casa
+-- Central), 1 Rafaela, 2 Humberto, 3 Moisés Ville. Lo importado de la
+-- planilla de Excel es todo de Sunchales.
+IF COL_LENGTH('dbo.PRPLANILLA', 'PLSUCURSAL') IS NULL
+    ALTER TABLE dbo.PRPLANILLA ADD PLSUCURSAL SMALLINT NOT NULL
+        CONSTRAINT DF_PRPLANILLA_PLSUCURSAL DEFAULT 0;
 GO
 
 IF OBJECT_ID('dbo.PRPLSOLMOT', 'U') IS NULL

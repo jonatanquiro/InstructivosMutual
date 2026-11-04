@@ -2891,4 +2891,7 @@ main.cb-main { max-width: 1200px; padding-bottom: 10rem; }
 .prest-dif-bien { color: var(--verde); font-weight: 600; }
 .prest-dif-mal { color: #c22a20; font-weight: 600; }
 :root[data-theme="oscuro"] .prest-dif-mal { color: #f28b84; }
-.main-proyectos #errorCarga:empty { display: none; }
+#errorEstadoPrestamos:empty { display: none; }
+.prest-lienzo { position: relative; }
+.prest-lista { margin: -0.4rem 0 1.3rem; }
+.prest-lista .tabla-usuarios { font-size: 0.82rem; }
