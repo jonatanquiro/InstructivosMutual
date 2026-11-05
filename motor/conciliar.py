@@ -40,10 +40,24 @@ PROPIAS = re.compile(CUIT_PROPIO + r'|PROPIAS|IGUAL TIT|MISMO TIT|ASOC\w*\.? ?MU
 FECHA_EN_CONCEPTO = re.compile(r'^(\d{1,2})/(\d{1,2})\b')
 
 
-def rubro_gasto(concepto):
+# Bancos que agrupan los gastos como los contabiliza la mutual. En el Nación
+# van en tres asientos: mantenimiento (comisiones, IVA e intereses), Ley
+# 25413 y SIRCREB; el resto de los bancos queda con el rubro de GASTOS.
+RUBROS_POR_BANCO = {
+    'NACION': {
+        'Comisiones y mantenimiento': 'Gastos de mantenimiento',
+        'IVA': 'Gastos de mantenimiento',
+        'Intereses': 'Gastos de mantenimiento',
+        'Impuesto Ley 25413 (déb/créd)': 'Ley débito/crédito (25413)',
+        'SIRCREB (Ingresos Brutos)': 'SIRCREB',
+    },
+}
+
+
+def rubro_gasto(concepto, banco=None):
     for nombre, rx in GASTOS:
         if rx.search(concepto):
-            return nombre
+            return RUBROS_POR_BANCO.get(banco, {}).get(nombre, nombre)
     return None
 
 

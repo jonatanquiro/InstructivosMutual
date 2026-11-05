@@ -44,7 +44,7 @@ def _claves(items, lado):
         x['k'] = f'{k}|{vistos[k]}'
 
 
-def _mov(x, lado, orden):
+def _mov(x, lado, orden, banco=None):
     texto = x['concepto'] + ' ' + x.get('detalle', '')
     cuit = CUIT.search(texto) if lado != 'M' else None
     return {
@@ -54,7 +54,7 @@ def _mov(x, lado, orden):
         'importe': x['importe'], 'saldo': x.get('saldo'),
         'por_acreditar': x.get('por_acreditar', 0.0),
         'cuit': cuit.group() if cuit else None,
-        'rubro_gasto': rubro_gasto(x['concepto']) if lado != 'M' else None,
+        'rubro_gasto': rubro_gasto(x['concepto'], banco) if lado != 'M' else None,
     }
 
 
@@ -83,9 +83,9 @@ def cmd_conciliar(base, banco, mes, anio):
     # últimos días (los asientos del día 1 pueden estar ahí y conciliarse a mano).
     usados_ant = {id(b) for g in grupos for b in g['banco']}
     desde_ant = date(anio, mes, 1) - timedelta(days=DIAS_ANTERIOR_VISIBLES)
-    movimientos = ([_mov(m, 'M', i) for i, m in enumerate(mayor)]
-                   + [_mov(b, 'B', i) for i, b in enumerate(banco_movs)]
-                   + [_mov(b, 'A', i) for i, b in enumerate(banco_ant)
+    movimientos = ([_mov(m, 'M', i, banco) for i, m in enumerate(mayor)]
+                   + [_mov(b, 'B', i, banco) for i, b in enumerate(banco_movs)]
+                   + [_mov(b, 'A', i, banco) for i, b in enumerate(banco_ant)
                       if id(b) in usados_ant or b['fecha'] >= desde_ant])
 
     return {

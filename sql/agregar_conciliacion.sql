@@ -3,7 +3,7 @@
 -- sólo agregan una referencia desde las tablas nuevas).
 -- Idempotente: se puede correr más de una vez sin romper nada.
 
--- Las 7 cuentas. "codigo" es el mismo nombre que usa el motor (motor/lectores.py,
+-- Las 6 cuentas. "codigo" es el mismo nombre que usa el motor (motor/lectores.py,
 -- diccionario BANCOS) y el prefijo del PDF del mayor (COINAG092026.pdf).
 IF OBJECT_ID('conc_bancos', 'U') IS NULL
 BEGIN
@@ -19,7 +19,6 @@ BEGIN
         ('COINAG',     N'Coinag',           'ARS', 1),
         ('CREDICOOP',  N'Credicoop',        'ARS', 2),
         ('FRANCES',    N'Francés',          'ARS', 3),
-        ('FRANCESUSD', N'Francés USD',      'USD', 4),
         ('NACION',     N'Nación',           'ARS', 5),
         ('SANTAFE',    N'Santa Fe (NBSF)',  'ARS', 6),
         ('RIO',        N'Santander (Río)',  'ARS', 7);
