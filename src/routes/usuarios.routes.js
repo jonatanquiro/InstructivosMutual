@@ -4,8 +4,9 @@ const { sql, getPool } = require("../config/db");
 
 const router = express.Router();
 
-// Todas las rutas de este archivo ya pasaron por requiereLogin +
-// requiereAdmin en server.js, así que acá asumimos que quien llama es admin.
+// Panel de Administración. Todas las rutas de este archivo ya pasaron por
+// requiereLogin + requiereGestion en server.js (montadas en /api/gestion):
+// sólo admin, Daniela y Jonatan.
 
 // Nivel de permiso de conciliación, en un solo valor para la pantalla.
 // Se guarda en conc_permisos: sin fila = "no"; las otras, según las columnas.
@@ -148,6 +149,41 @@ router.post("/usuarios/:id/password", async (req, res) => {
     res.json({ ok: true });
   } catch (error) {
     console.error("Error cambiando contraseña:", error);
+    res.status(500).json({ error: "Error de servidor" });
+  }
+});
+
+// ------------------------------------------------ Bancos de conciliación
+// Qué bancos aparecen en la pantalla de conciliación. Ocultar no borra nada:
+// los meses ya cargados quedan guardados y vuelven a verse al mostrarlo.
+router.get("/conciliacion-bancos", async (req, res) => {
+  try {
+    const pool = await getPool();
+    const r = await pool.request().query(`
+      SELECT b.codigo, b.nombre, b.moneda, b.orden, b.activo,
+             (SELECT COUNT(*) FROM conc_periodos p WHERE p.banco = b.codigo) AS meses
+      FROM conc_bancos b ORDER BY b.orden
+    `);
+    res.json(r.recordset);
+  } catch (error) {
+    console.error("Error listando bancos de conciliación:", error);
+    res.status(500).json({ error: "Error de servidor" });
+  }
+});
+
+router.put("/conciliacion-bancos/:codigo", async (req, res) => {
+  const { activo } = req.body;
+  if (typeof activo !== "boolean") return res.status(400).json({ error: "Falta indicar si se ve o no" });
+  try {
+    const pool = await getPool();
+    const r = await pool.request()
+      .input("codigo", sql.NVarChar, req.params.codigo)
+      .input("activo", sql.Bit, activo)
+      .query("UPDATE conc_bancos SET activo = @activo WHERE codigo = @codigo");
+    if (!r.rowsAffected[0]) return res.status(404).json({ error: "Ese banco no existe" });
+    res.json({ ok: true });
+  } catch (error) {
+    console.error("Error cambiando banco de conciliación:", error);
     res.status(500).json({ error: "Error de servidor" });
   }
 });

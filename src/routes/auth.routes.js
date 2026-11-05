@@ -1,6 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcrypt");
 const { sql, getPool } = require("../config/db");
+const { esGestor } = require("../middleware/auth");
 
 const router = express.Router();
 
@@ -81,6 +82,8 @@ router.get("/me", async (req, res) => {
       nombreCompleto: req.session.nombreCompleto,
       rol: req.session.rol,
       fotoUrl: fotoArchivo ? `/uploads/perfiles/${fotoArchivo}` : null,
+      // Administración (usuarios, permisos, bancos): sólo los gestores.
+      puedeAdministrar: await esGestor(req),
     });
   } catch (error) {
     console.error("Error trayendo /me:", error);

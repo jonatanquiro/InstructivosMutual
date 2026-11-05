@@ -8,7 +8,9 @@ const http = require("http");
 const express = require("express");
 const session = require("express-session");
 
-const { requiereLogin, requiereAdmin, requiereConciliacion, requiereChatActivo } = require("./middleware/auth");
+const {
+  requiereLogin, requiereAdmin, requiereConciliacion, requiereChatActivo, requiereGestion,
+} = require("./middleware/auth");
 const { inicializar: inicializarSocket } = require("./config/socket");
 const authRoutes = require("./routes/auth.routes");
 const faqRoutes = require("./routes/faq.routes");
@@ -70,7 +72,9 @@ app.use("/api", requiereLogin, chatRoutes);
 // Con prefijo propio: adentro aplica requiereConciliacion a casi todo, y
 // montado en "/api" a secas cortaría requests de los routers de abajo.
 app.use("/api/conciliacion", requiereLogin, conciliacionRoutes);
-app.use("/api", requiereLogin, requiereAdmin, usuariosRoutes);
+// Administración de usuarios, permisos y bancos: sólo los gestores (ver
+// requiereGestion). Con prefijo propio para no cortar a los routers de abajo.
+app.use("/api/gestion", requiereLogin, requiereGestion, usuariosRoutes);
 app.use("/api", requiereLogin, requiereAdmin, faqAdminRoutes);
 app.use("/api", requiereLogin, requiereAdmin, estadisticasRoutes);
 app.use("/api", requiereLogin, requiereAdmin, prestamosRoutes);
@@ -106,7 +110,7 @@ app.use("/uploads/perfiles", requiereLogin, express.static(CARPETA_UPLOADS_PERFI
 // El control de préstamos pasó a ser un módulo de Proyectos.
 app.get("/prestamos.html", (req, res) => res.redirect("/proyectos.html#estado-prestamos"));
 
-app.get("/usuarios.html", requiereLogin, requiereAdmin, (req, res) => {
+app.get("/usuarios.html", requiereLogin, requiereGestion, (req, res) => {
   res.sendFile(path.join(__dirname, "public", "usuarios.html"));
 });
 

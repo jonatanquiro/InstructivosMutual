@@ -71,6 +71,36 @@ async function requiereConciliacion(req, res, next) {
   return res.redirect("/");
 }
 
+// Administración (usuarios, claves, permisos de conciliación y bancos que se
+// ven): sólo estos usuarios, sean admin o no. Otros admin siguen usando FAQ,
+// Proyectos, etc., pero no tocan usuarios ni permisos. GESTION_USUARIOS en el
+// .env cambia la lista (separada por comas).
+const GESTORES = (process.env.GESTION_USUARIOS || "admin,daniela,jonatan")
+  .split(",").map((u) => u.trim().toLowerCase()).filter(Boolean);
+
+// Se consulta en cada request por el nombre de usuario (no se guarda en la
+// sesión) para que valga también para sesiones abiertas antes del cambio.
+async function esGestor(req) {
+  if (!req.session?.usuarioId) return false;
+  const pool = await getPool();
+  const r = await pool.request().input("id", sql.Int, req.session.usuarioId)
+    .query("SELECT nombre_usuario FROM app_usuarios WHERE id = @id AND activo = 1");
+  const nombre = r.recordset[0]?.nombre_usuario;
+  return !!nombre && GESTORES.includes(nombre.trim().toLowerCase());
+}
+
+async function requiereGestion(req, res, next) {
+  try {
+    if (await esGestor(req)) return next();
+  } catch (error) {
+    console.error("Error verificando permiso de administración:", error);
+  }
+  if (req.originalUrl.startsWith("/api/")) {
+    return res.status(403).json({ error: "No autorizado" });
+  }
+  return res.redirect("/");
+}
+
 // El chat interno se puede apagar para todos desde Configuración (admin).
 // Apagado, ni la página ni su API responden (no alcanza con esconder el botón).
 async function requiereChatActivo(req, res, next) {
@@ -81,4 +111,7 @@ async function requiereChatActivo(req, res, next) {
   return res.redirect("/");
 }
 
-module.exports = { requiereLogin, requiereAdmin, requiereConciliacion, permisoConciliacion, requiereChatActivo };
+module.exports = {
+  requiereLogin, requiereAdmin, requiereConciliacion, permisoConciliacion, requiereChatActivo,
+  requiereGestion, esGestor,
+};

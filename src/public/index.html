@@ -69,8 +69,8 @@
 
       <a class="tarjeta-menu" href="/usuarios.html" id="tarjetaUsuarios" hidden>
         <span class="tarjeta-icono">👤</span>
-        <span class="tarjeta-titulo">Usuarios</span>
-        <span class="tarjeta-desc">Crear y administrar usuarios</span>
+        <span class="tarjeta-titulo">Administración</span>
+        <span class="tarjeta-desc">Usuarios, claves, permisos y bancos de conciliación</span>
       </a>
 
       <a class="tarjeta-menu" href="/faq-admin.html" id="tarjetaFaqAdmin" hidden>
@@ -91,8 +91,9 @@
       try {
         const respuesta = await fetch("/api/auth/me");
         const datos = await respuesta.json();
+        // Administración: sólo admin, Daniela y Jonatan (lo decide el servidor).
+        if (datos.puedeAdministrar) document.getElementById("tarjetaUsuarios").hidden = false;
         if (datos.rol === "admin") {
-          document.getElementById("tarjetaUsuarios").hidden = false;
           document.getElementById("tarjetaFaqAdmin").hidden = false;
           document.getElementById("tarjetaProyectos").hidden = false;
         }

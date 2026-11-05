@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Gestión de Usuarios — Información Mutual</title>
+  <title>Administración — Información Mutual</title>
   <link rel="icon" type="image/png" href="/img/logo-mutual.png" />
   <script>
     (function () {
@@ -17,7 +17,7 @@
   <header class="barra">
     <div class="barra-izq">
       <img src="/img/logo-blanco.png" alt="Logo Mutual" class="logo-barra" />
-      <h1>Gestión de Usuarios</h1>
+      <h1>Administración</h1>
       <span class="saludo" id="saludo"></span>
     </div>
   </header>
@@ -47,7 +47,12 @@
     </div>
 
     <h2>Usuarios existentes</h2>
+    <p class="ayuda-admin">La columna <strong>Conciliación</strong> define quién entra a las conciliaciones bancarias y si puede cerrar o reabrir meses.</p>
     <div id="listaUsuarios">Cargando...</div>
+
+    <h2>Bancos de conciliación</h2>
+    <p class="ayuda-admin">Destildá un banco para que no aparezca en la conciliación. No se borra nada: si tenía meses cargados, vuelven a verse al tildarlo.</p>
+    <div id="listaBancos">Cargando...</div>
   </main>
 
   <footer class="barra-inferior">
@@ -67,7 +72,7 @@
 
     async function cargarUsuarios() {
       const contenedor = document.getElementById("listaUsuarios");
-      const respuesta = await fetch("/api/usuarios");
+      const respuesta = await fetch("/api/gestion/usuarios");
 
       if (respuesta.status === 401) {
         window.location.href = "/login.html";
@@ -150,7 +155,7 @@
       const activo = fila.querySelector(".input-activo").checked;
       const conciliacion = fila.querySelector(".input-conciliacion").value;
 
-      const respuesta = await fetch(`/api/usuarios/${id}`, {
+      const respuesta = await fetch(`/api/gestion/usuarios/${id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombreCompleto, rol, activo, conciliacion }),
@@ -168,7 +173,7 @@
       const nuevaClave = prompt("Nueva contraseña para este usuario:");
       if (!nuevaClave) return;
 
-      const respuesta = await fetch(`/api/usuarios/${id}/password`, {
+      const respuesta = await fetch(`/api/gestion/usuarios/${id}/password`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ password: nuevaClave }),
@@ -192,7 +197,7 @@
       const password = document.getElementById("nuevoPassword").value;
       const rol = document.getElementById("nuevoRol").value;
 
-      const respuesta = await fetch("/api/usuarios", {
+      const respuesta = await fetch("/api/gestion/usuarios", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ nombreUsuario, nombreCompleto, password, rol }),
@@ -208,7 +213,39 @@
       cargarUsuarios();
     });
 
+    async function cargarBancos() {
+      const contenedor = document.getElementById("listaBancos");
+      const respuesta = await fetch("/api/gestion/conciliacion-bancos");
+      if (!respuesta.ok) {
+        contenedor.innerHTML = '<div class="sin-resultados">No se pudieron traer los bancos.</div>';
+        return;
+      }
+      const bancos = await respuesta.json();
+      contenedor.innerHTML = `<table class="tabla-usuarios">
+        <thead><tr><th>Se ve</th><th>Banco</th><th>Código</th><th>Moneda</th><th>Meses cargados</th></tr></thead>
+        <tbody>${bancos.map((b) => `<tr>
+          <td><input type="checkbox" data-banco="${b.codigo}" ${b.activo ? "checked" : ""} /></td>
+          <td>${b.nombre}</td><td>${b.codigo}</td><td>${b.moneda}</td><td>${b.meses}</td></tr>`).join("")}</tbody>
+      </table>`;
+      for (const casilla of contenedor.querySelectorAll("input[data-banco]")) {
+        casilla.addEventListener("change", async () => {
+          casilla.disabled = true;
+          const r = await fetch(`/api/gestion/conciliacion-bancos/${encodeURIComponent(casilla.dataset.banco)}`, {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ activo: casilla.checked }),
+          });
+          casilla.disabled = false;
+          if (!r.ok) {
+            casilla.checked = !casilla.checked;
+            alert((await r.json().catch(() => ({}))).error || "No se pudo guardar");
+          }
+        });
+      }
+    }
+
     cargarUsuarios();
+    cargarBancos();
   </script>
 </body>
 </html>
