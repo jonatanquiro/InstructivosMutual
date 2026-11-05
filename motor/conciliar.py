@@ -55,8 +55,15 @@ RUBROS_POR_BANCO = {
 }
 
 
+# Débitos que en un banco puntual también van en el asiento de gastos.
+GASTOS_EXTRA_POR_BANCO = {
+    # Nación: el "DEBITO PAGO DIRECTO" de unos pesos entra en el asiento de gastos.
+    'NACION': [('Comisiones y mantenimiento', re.compile(r'DEBITO PAGO DIRECTO', re.I))],
+}
+
+
 def rubro_gasto(concepto, banco=None):
-    for nombre, rx in GASTOS:
+    for nombre, rx in GASTOS + GASTOS_EXTRA_POR_BANCO.get(banco, []):
         if rx.search(concepto):
             return RUBROS_POR_BANCO.get(banco, {}).get(nombre, nombre)
     return None
@@ -110,7 +117,7 @@ def conciliar(mayor, banco, banco_ant, banco_cod=None):
     pares = []
     for i, m in enumerate(mayor):
         for j, b in enumerate(banco):
-            if b['importe'] == m['importe'] and b['importe'] != 0 and not rubro_gasto(b['concepto']):
+            if b['importe'] == m['importe'] and b['importe'] != 0 and not rubro_gasto(b['concepto'], banco_cod):
                 d = abs((b['fecha'] - m['fecha']).days)
                 if d <= DIAS_1A1:
                     pares.append((d, -parecido(m, b), i, j, m, b))
@@ -155,7 +162,7 @@ def conciliar(mayor, banco, banco_ant, banco_cod=None):
         clases = {}
         for b in banco:
             if (not b['ok'] and b['importe'] * signo > 0 and abs((b['fecha'] - m['fecha']).days) <= 1
-                    and not rubro_gasto(b['concepto'])):
+                    and not rubro_gasto(b['concepto'], banco_cod)):
                 clave = re.sub(r'[^A-Za-z ]', '', b['concepto']).split()[:1]
                 clases.setdefault(' '.join(clave), []).append((round(abs(b['importe']) * 100), b))
         for cands in clases.values():
@@ -169,7 +176,7 @@ def conciliar(mayor, banco, banco_ant, banco_cod=None):
     for antes, despues, tol in ((0, 0, 0), (0, 0, TOL_CENTAVOS), (4, 0, 0), (4, 0, TOL_CENTAVOS),
                                 (5, 5, TOL_CENTAVOS)):
         for b in banco:
-            if b['ok'] or b['importe'] == 0 or rubro_gasto(b['concepto']):
+            if b['ok'] or b['importe'] == 0 or rubro_gasto(b['concepto'], banco_cod):
                 continue
             cands = [m for m in mayor if not m['ok']
                      and -antes <= (m['fecha'] - b['fecha']).days <= despues]
@@ -192,7 +199,7 @@ def conciliar(mayor, banco, banco_ant, banco_cod=None):
     for m in mayor:
         if m['ok'] or m['importe'] == 0:
             continue
-        cands = [b for b in banco if not b['ok'] and b['importe'] * m['importe'] > 0 and not rubro_gasto(b['concepto'])
+        cands = [b for b in banco if not b['ok'] and b['importe'] * m['importe'] > 0 and not rubro_gasto(b['concepto'], banco_cod)
                  and abs(b['importe'] - m['importe']) <= TOL_CENTAVOS and abs((b['fecha'] - m['fecha']).days) <= 3]
         if len(cands) == 1:
             dif = round(m['importe'] - cands[0]['importe'], 2)
@@ -202,7 +209,7 @@ def conciliar(mayor, banco, banco_ant, banco_cod=None):
     for m in mayor:
         if m['ok'] or m['importe'] == 0:
             continue
-        cands = [b for b in banco if not b['ok'] and b['importe'] == m['importe'] and not rubro_gasto(b['concepto'])]
+        cands = [b for b in banco if not b['ok'] and b['importe'] == m['importe'] and not rubro_gasto(b['concepto'], banco_cod)]
         otros = [x for x in mayor if not x['ok'] and x['importe'] == m['importe']]
         if len(cands) == 1 and len(otros) == 1:
             dias = abs((cands[0]['fecha'] - m['fecha']).days)
@@ -216,11 +223,14 @@ def conciliar(mayor, banco, banco_ant, banco_cod=None):
             f = FECHA_EN_CONCEPTO.match(m['concepto'])
             if m['ok'] or not f or int(f.group(2)) != banco_ant[0]['fecha'].month:
                 continue
-            cands = [b for b in banco_ant if not b['ok'] and b['importe'] == m['importe']]
+            cands = [b for b in banco_ant if not b['ok'] and b['importe'] == m['importe']
+                     and not rubro_gasto(b['concepto'], banco_cod)]
             cands.sort(key=lambda b: abs(b['fecha'].day - int(f.group(1))))
             if cands:
                 cerrar('Mes anterior', [m], cands[:1], 'El banco lo registró el mes anterior')
-        cola = [b for b in banco_ant if (inicio - b['fecha']).days <= DIAS_CRUCE_MES]
+        # Los gastos del resumen anterior no: van todos juntos contra el asiento de gastos (regla 5).
+        cola = [b for b in banco_ant if (inicio - b['fecha']).days <= DIAS_CRUCE_MES
+                and not rubro_gasto(b['concepto'], banco_cod)]
         for m in mayor:
             if m['ok'] or (m['fecha'] - inicio).days >= DIAS_CRUCE_MES:
                 continue

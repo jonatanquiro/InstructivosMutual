@@ -556,6 +556,8 @@ async function prepararArrastre(periodoId, usuarioId) {
     const rLibres = await req().query(`
       SELECT m.id, m.lado, m.fecha, m.importe FROM conc_movimientos m
       WHERE m.periodo_id = @p AND m.lado IN ('M', 'B', 'Q', 'R') AND m.importe <> 0 AND ${SIN_CRUCE_VIGENTE}
+        -- Los gastos del banco van todos juntos contra el asiento de gastos, nunca uno a uno.
+        AND m.rubro_gasto IS NULL
       ORDER BY m.fecha, m.orden
     `);
     const libres = rLibres.recordset.map((m) => ({ ...m, centavos: centavos(m.importe) }));
@@ -855,10 +857,11 @@ function calcularCuadre(periodo, movimientos, cruces, conArrastre) {
   const calculado = finMayor + suma(deBancoPendientes) - suma(deMayorPendientes) - difs;
 
   // Renglones de la planilla en papel (CONCILIACIÓN BANCARIA), con importe
-  // con signo. Columna A.M.C.A.U.: saldo del mayor + lo que el banco tiene y
-  // el mayor no (los gastos, un renglón por rubro) − diferencias de lo
-  // conciliado. Columna banco: saldo del banco + lo que el mayor tiene y el
-  // banco no. Si todo está conciliado, las dos llegan al mismo saldo.
+  // con signo. Como en la planilla manual, todos los ajustes van en la columna
+  // A.M.C.A.U.: saldo del mayor + lo que el banco tiene y el mayor no (los
+  // gastos, un renglón por rubro) − lo que el mayor tiene y el banco no −
+  // diferencias de lo conciliado. La columna del banco lleva sólo su saldo.
+  // Si todo está conciliado, las dos llegan al mismo saldo.
   const porFecha = (a, b) => String(fechaIso(a.fecha)).localeCompare(String(fechaIso(b.fecha))) || (a.orden || 0) - (b.orden || 0);
   const renglon = (columna, m, importe) => ({
     columna, importe: pesos(importe), fecha: m.fecha ? fechaIso(m.fecha) : null,
@@ -880,7 +883,7 @@ function calcularCuadre(periodo, movimientos, cruces, conArrastre) {
     }),
     ...[...pendOtros].sort(porFecha).map((m) => renglon("amcau", m, centavos(m.importe))),
     ...lineasDif.map(({ m, dif }) => ({ ...renglon("amcau", m, -dif), diferencia: true })),
-    ...[...deMayorPendientes].sort(porFecha).map((m) => renglon("banco", m, centavos(m.importe))),
+    ...[...deMayorPendientes].sort(porFecha).map((m) => renglon("amcau", m, -centavos(m.importe))),
   ];
 
   return {
