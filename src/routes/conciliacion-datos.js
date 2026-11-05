@@ -798,6 +798,7 @@ function calcularCuadre(periodo, movimientos, cruces, conArrastre) {
 
   let totMesAnt = 0;
   let difs = 0;
+  const lineasDif = [];
   for (const c of activos) {
     const items = c.items.map((id) => porId.get(id)).filter(Boolean);
     const delMayor = items.filter(ES_MAYOR);
@@ -806,7 +807,11 @@ function calcularCuadre(periodo, movimientos, cruces, conArrastre) {
     // (del motor o hecho a mano con un movimiento 'A') explica la diferencia inicial.
     const conMesAnterior = REGLAS_MES_ANTERIOR.includes(c.regla) || items.some((m) => m.lado === "A");
     if (!conArrastre && conMesAnterior) totMesAnt += suma(delMayor);
-    else if (delMayor.length && delBanco.length) difs += suma(delMayor) - suma(delBanco);
+    else if (delMayor.length && delBanco.length) {
+      const dif = suma(delMayor) - suma(delBanco);
+      difs += dif;
+      if (dif !== 0) lineasDif.push({ m: delMayor[0], dif });
+    }
   }
   if (conArrastre) {
     totMesAnt = suma(movimientos.filter((m) => m.lado === "Q")) - suma(movimientos.filter((m) => m.lado === "R"));
@@ -819,7 +824,28 @@ function calcularCuadre(periodo, movimientos, cruces, conArrastre) {
   const difIni = iniBanco - iniMayor;
   const calculado = finMayor + suma(deBancoPendientes) - suma(deMayorPendientes) - difs;
 
+  // Renglones de la planilla en papel (CONCILIACIÓN BANCARIA), con importe
+  // con signo. Columna A.M.C.A.U.: saldo del mayor + lo que el banco tiene y
+  // el mayor no (los gastos, un renglón por rubro) − diferencias de lo
+  // conciliado. Columna banco: saldo del banco + lo que el mayor tiene y el
+  // banco no. Si todo está conciliado, las dos llegan al mismo saldo.
+  const porFecha = (a, b) => String(fechaIso(a.fecha)).localeCompare(String(fechaIso(b.fecha))) || (a.orden || 0) - (b.orden || 0);
+  const renglon = (columna, m, importe) => ({
+    columna, importe: pesos(importe), fecha: m.fecha ? fechaIso(m.fecha) : null,
+    concepto: m.concepto, detalle: m.detalle || "", nro: m.nro || "",
+    mes_siguiente: mesSiguiente.has(m.id), arrastrado: m.lado === "Q" || m.lado === "R",
+  });
+  const rubros = new Map();
+  for (const m of pendGastos) rubros.set(m.rubro_gasto, (rubros.get(m.rubro_gasto) || 0) + centavos(m.importe));
+  const planilla = [
+    ...[...rubros].map(([rubro, total]) => ({ columna: "amcau", importe: pesos(total), concepto: rubro, gasto: true })),
+    ...[...pendOtros].sort(porFecha).map((m) => renglon("amcau", m, centavos(m.importe))),
+    ...lineasDif.map(({ m, dif }) => ({ ...renglon("amcau", m, -dif), diferencia: true })),
+    ...[...deMayorPendientes].sort(porFecha).map((m) => renglon("banco", m, centavos(m.importe))),
+  ];
+
   return {
+    planilla,
     conteo,
     propuestas: cruces.filter((c) => !c.deshecho && c.estado === "a_confirmar").length,
     con_arrastre: !!conArrastre,

@@ -2584,11 +2584,35 @@ body.conc-informe .num { text-align: right; white-space: nowrap; font-variant-nu
 .conc-informe-firmas div { flex: 1; text-align: center; font-size: 0.85rem; }
 .conc-informe-firmas span { display: block; border-top: 1px solid #333; margin-bottom: 0.3rem; }
 .conc-informe-pie { margin-top: 2rem; font-size: 0.72rem; color: #666; }
+
+/* Planilla CONCILIACIÓN BANCARIA (hoja 1 del informe, como la de papel) */
+.conc-planilla { max-width: 800px; margin: 0 auto; font-family: Arial, Helvetica, sans-serif; color: #000; }
+.conc-planilla-entidad { text-align: right; margin: 0 0 1rem; font-size: 0.95rem; }
+.conc-planilla h1 { font-size: 1.15rem; font-weight: 400; text-decoration: underline; margin: 0 0 1rem; letter-spacing: 0.02em; }
+.conc-planilla-datos { display: grid; grid-template-columns: 1fr auto auto; gap: 3rem; font-size: 0.85rem; margin-bottom: 0.8rem; }
+.conc-planilla-provisorio { color: #b00; font-weight: 700; font-size: 0.85rem; margin: 0 0 0.5rem; }
+.conc-planilla-tabla { width: 100%; border-collapse: collapse; font-size: 0.78rem; table-layout: fixed; }
+.conc-planilla-tabla col.desc { width: 44%; }
+.conc-planilla-tabla th { font-weight: 400; border: 1px solid #000; padding: 0.1rem 0.3rem; text-align: center; }
+.conc-planilla-tabla td { border-left: 1px solid #000; border-right: 1px solid #000; border-bottom: 1px solid #bbb;
+  padding: 0.18rem 0.3rem; height: 1.25rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.conc-planilla-tabla td em { font-size: 0.7rem; color: #333; }
+.conc-planilla-tabla .num { text-align: right; font-variant-numeric: tabular-nums; }
+.conc-planilla-tabla tfoot td { border: 1px solid #000; }
+.conc-planilla-tabla tfoot tr.total td:first-child { text-align: center; }
+.conc-planilla-tabla tfoot tr.total:first-child td { border-top: 3px double #000; }
+.conc-planilla-tabla tfoot tr.diferencia td { color: #b00; font-weight: 700; }
+.conc-planilla-firmas { display: grid; grid-template-columns: 1fr 1fr; gap: 3rem; margin-top: 1.2rem; font-size: 0.85rem; text-align: center; }
+.conc-planilla-firmas p { margin: 0 0 2.5rem; text-align: left; }
+.conc-planilla-firmas .linea { display: block; border-top: 1px solid #000; margin-bottom: 0.2rem; }
+
 @media print {
   .conc-informe-acciones, .conc-avisos { display: none; }
   body.conc-informe { padding: 0; max-width: none; }
   body.conc-informe section { break-inside: avoid-page; }
   .conc-informe-tabla tr { break-inside: avoid; }
+  .conc-planilla { max-width: none; }
+  .conc-anexo { break-before: page; }
 }
 
 /* Barra de lo tildado: arriba de la barra inferior fija */
