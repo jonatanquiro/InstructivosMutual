@@ -582,10 +582,10 @@
         && /BANC|GASTO|COMIS|IMP|LEY|SIRCREB|IVA|INTERES|SEGUR/i.test(m.concepto));
       return `
         <div class="cb-explica">
-          <strong>${lista.length} gastos, comisiones e impuestos por ${pesos(sumar(lista))}</strong> que el banco debitó y
-          todavía no tienen asiento en el mayor. <strong>Es lo normal y no hay que hacer nada con ellos ahora:</strong>
-          se asientan todos juntos el mes siguiente. Al cerrar el mes pasan solos al mes que viene, y ahí el sistema
-          los propone contra ese asiento.
+          <strong>${lista.length} gastos, comisiones e impuestos por ${pesos(sumar(lista))}</strong> sin conciliar.
+          Los del resumen de <strong>este</strong> mes no aparecen acá: quedan en «Mes siguiente», porque su asiento va
+          en el mayor del mes que viene. Los de acá son del resumen <strong>anterior</strong>: se concilian contra el
+          asiento de gastos del mayor de este mes (si el sistema no lo propuso, con «Conciliar gastos a mano»).
         </div>
         ${yaEnPropuesta}
         <table class="cb-tabla">
@@ -739,15 +739,20 @@
           return preguntar("Elegiste renglones de un solo lado y no se anulan entre sí. Elegí también los del otro lado.",
             [{ valor: true, texto: "Entendido" }]);
         }
-      } else if (cent(mayor) !== cent(banco)) {
+      }
+      let diferenciaAGastos = false;
+      if (mayor.length && banco.length && cent(mayor) !== cent(banco)) {
         const ok = await preguntar(`Entre el mayor y el banco hay una diferencia de ${pesos((cent(mayor) - cent(banco)) / 100)}. ` +
-          "¿Conciliar igual? La diferencia queda registrada.", [
+          "¿Conciliar igual? Podés dejar la diferencia registrada en este cruce, o pasarla a gastos: queda pendiente " +
+          "como «Diferencias a imputar en gastos» hasta conciliarla con el asiento de gastos (si no, pasa al mes siguiente).", [
+          { valor: "gastos", texto: "Pasar la diferencia a gastos" },
           { valor: true, texto: "Conciliar con diferencia" }, { valor: false, texto: "Cancelar", secundario: true }]);
         if (!ok) return;
+        diferenciaAGastos = ok === "gastos";
       }
       await ejecutar(`/api/conciliacion/periodos/${datos.periodo.id}/cruces`, {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ movimientos: ids }),
+        body: JSON.stringify({ movimientos: ids, diferenciaAGastos }),
       }, () => { ids.forEach((id) => elegidos.delete(id)); cerrarPanel(); });
     }
 

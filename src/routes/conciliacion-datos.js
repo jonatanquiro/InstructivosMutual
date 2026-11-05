@@ -36,8 +36,12 @@ const pesos = (c) => c / 100;
 //   'mes_siguiente' un solo movimiento, marcado "Se registra el mes siguiente":
 //                   no está conciliado (sigue pendiente en el cuadre y pasa al mes
 //                   siguiente al cerrar) pero ya no figura entre lo que hay que revisar.
-function estadoInicialCruce() {
-  return "a_confirmar";
+// Excepción: los gastos del resumen del mes que el motor agrupa por rubro
+// (su asiento va en el mayor del mes siguiente) entran directamente como
+// "mes siguiente": se ven, no se concilian contra nada y pasan al cerrar.
+const TIPO_GASTOS_MES_SIGUIENTE = "Gastos: a conciliar el mes siguiente";
+function estadoInicialCruce(grupo) {
+  return grupo?.tipo === TIPO_GASTOS_MES_SIGUIENTE ? "mes_siguiente" : "a_confirmar";
 }
 
 // Condiciones SQL sobre un movimiento "m".
@@ -269,8 +273,10 @@ async function guardarResultado(pool, periodoId, r, usuarioId) {
     }
     await req().bulk(tablaMov);
     await req().query(`
-      -- Los pendientes arrastrados del mes anterior (Q/R) no vienen del motor: no se tocan.
-      WITH destino AS (SELECT * FROM conc_movimientos WHERE periodo_id = @periodoId AND lado NOT IN ('Q', 'R'))
+      -- Los pendientes arrastrados del mes anterior (Q/R) y las diferencias
+      -- pasadas a gastos (B|AJUSTE|...) no vienen del motor: no se tocan.
+      WITH destino AS (SELECT * FROM conc_movimientos WHERE periodo_id = @periodoId AND lado NOT IN ('Q', 'R')
+                       AND clave NOT LIKE 'B|AJUSTE|%')
       MERGE destino
       USING #conc_nuevos AS n ON destino.clave = n.clave
       WHEN MATCHED THEN UPDATE SET
@@ -544,6 +550,9 @@ async function prepararArrastre(periodoId, usuarioId) {
 
     // 4) Pendientes arrastrados contra pendientes del mes, mismo importe exacto:
     //    asiento viejo (R) contra el banco (B), banco viejo (Q) contra el mayor (M).
+    //    Si no hay, contra su anulación del mismo lado: un asiento mal cargado
+    //    (ej. de otro banco) que este mes se contraasienta (R contra M con el
+    //    importe opuesto), o un movimiento del banco que se revirtió (Q contra B).
     const rLibres = await req().query(`
       SELECT m.id, m.lado, m.fecha, m.importe FROM conc_movimientos m
       WHERE m.periodo_id = @p AND m.lado IN ('M', 'B', 'Q', 'R') AND m.importe <> 0 AND ${SIN_CRUCE_VIGENTE}
@@ -552,19 +561,40 @@ async function prepararArrastre(periodoId, usuarioId) {
     const libres = rLibres.recordset.map((m) => ({ ...m, centavos: centavos(m.importe) }));
     const tomados = new Set();
     const nuevos = [];
+    const desdeDe = (viejo) => new Date(viejo.fecha.getTime() - DIAS_ARRASTRE * 86400000);
+    const masCercano = (viejo) => (a, b) => Math.abs(a.fecha - viejo.fecha) - Math.abs(b.fecha - viejo.fecha);
     for (const viejo of libres.filter((m) => m.lado === "R" || m.lado === "Q")) {
+      if (tomados.has(viejo.id)) continue;
       const buscado = viejo.lado === "R" ? "B" : "M";
-      const desde = new Date(viejo.fecha.getTime() - DIAS_ARRASTRE * 86400000);
       const candidatos = libres
-        .filter((m) => m.lado === buscado && !tomados.has(m.id) && m.centavos === viejo.centavos && m.fecha >= desde)
-        .sort((a, b) => Math.abs(a.fecha - viejo.fecha) - Math.abs(b.fecha - viejo.fecha));
-      if (!candidatos.length) continue;
-      tomados.add(candidatos[0].id);
+        .filter((m) => m.lado === buscado && !tomados.has(m.id) && m.centavos === viejo.centavos && m.fecha >= desdeDe(viejo))
+        .sort(masCercano(viejo));
+      if (candidatos.length) {
+        tomados.add(viejo.id);
+        tomados.add(candidatos[0].id);
+        nuevos.push({
+          ids: [viejo.id, candidatos[0].id],
+          regla: "Pendiente del mes anterior",
+          nota: candidatos.length === 1 ? "Quedó pendiente al cerrar el mes anterior."
+            : `Quedó pendiente al cerrar el mes anterior. Había ${candidatos.length} movimientos con el mismo importe; se propone el de fecha más cercana.`,
+        });
+        continue;
+      }
+      // Anulación del mismo lado (importe opuesto, en cualquier día del mes).
+      const mismoLado = viejo.lado === "R" ? "M" : "B";
+      const opuestos = libres
+        .filter((m) => m.lado === mismoLado && !tomados.has(m.id) && m.centavos === -viejo.centavos)
+        .sort(masCercano(viejo));
+      if (!opuestos.length) continue;
+      tomados.add(viejo.id);
+      tomados.add(opuestos[0].id);
       nuevos.push({
-        ids: [viejo.id, candidatos[0].id],
-        estado: "a_confirmar",
-        nota: candidatos.length === 1 ? "Quedó pendiente al cerrar el mes anterior."
-          : `Quedó pendiente al cerrar el mes anterior. Había ${candidatos.length} movimientos con el mismo importe; se propone el de fecha más cercana.`,
+        ids: [viejo.id, opuestos[0].id],
+        regla: viejo.lado === "R" ? "Anulados en mayor" : "Anulados en banco",
+        nota: (viejo.lado === "R"
+          ? "Asiento que quedó pendiente el mes anterior y su contraasiento de este mes."
+          : "Movimiento del banco que quedó pendiente el mes anterior y su reversa de este mes.")
+          + (opuestos.length > 1 ? ` Había ${opuestos.length} con el mismo importe; se propone el de fecha más cercana.` : ""),
       });
     }
     if (nuevos.length) {
@@ -573,12 +603,12 @@ async function prepararArrastre(periodoId, usuarioId) {
       for (const n of nuevos) {
         const rC = await req()
           .input("numero", sql.Int, ++numero)
-          .input("estado", sql.NVarChar, n.estado)
+          .input("regla", sql.NVarChar, n.regla)
           .input("nota", sql.NVarChar, n.nota)
           .query(`
             INSERT INTO conc_cruces (periodo_id, numero, origen, regla, nota, estado, diferencia)
             OUTPUT inserted.id
-            VALUES (@p, @numero, 'auto', N'Pendiente del mes anterior', @nota, @estado, 0)
+            VALUES (@p, @numero, 'auto', @regla, @nota, 'a_confirmar', 0)
           `);
         await req().query(`INSERT INTO conc_cruce_items (cruce_id, movimiento_id) VALUES
           (${rC.recordset[0].id}, ${n.ids[0]}), (${rC.recordset[0].id}, ${n.ids[1]})`);
@@ -835,10 +865,19 @@ function calcularCuadre(periodo, movimientos, cruces, conArrastre) {
     concepto: m.concepto, detalle: m.detalle || "", nro: m.nro || "",
     mes_siguiente: mesSiguiente.has(m.id), arrastrado: m.lado === "Q" || m.lado === "R",
   });
+  // Gastos por rubro, separando los del mes (se asientan el mes siguiente) de
+  // los que vienen del mes anterior y todavía no se concilian.
   const rubros = new Map();
-  for (const m of pendGastos) rubros.set(m.rubro_gasto, (rubros.get(m.rubro_gasto) || 0) + centavos(m.importe));
+  for (const m of pendGastos) {
+    const clave = `${m.rubro_gasto}|${mesSiguiente.has(m.id) ? 1 : 0}|${m.lado === "Q" ? 1 : 0}`;
+    rubros.set(clave, (rubros.get(clave) || 0) + centavos(m.importe));
+  }
   const planilla = [
-    ...[...rubros].map(([rubro, total]) => ({ columna: "amcau", importe: pesos(total), concepto: rubro, gasto: true })),
+    ...[...rubros].map(([clave, total]) => {
+      const [rubro, ms, q] = clave.split("|");
+      return { columna: "amcau", importe: pesos(total), concepto: rubro, gasto: true,
+        mes_siguiente: ms === "1", arrastrado: q === "1" };
+    }),
     ...[...pendOtros].sort(porFecha).map((m) => renglon("amcau", m, centavos(m.importe))),
     ...lineasDif.map(({ m, dif }) => ({ ...renglon("amcau", m, -dif), diferencia: true })),
     ...[...deMayorPendientes].sort(porFecha).map((m) => renglon("banco", m, centavos(m.importe))),
@@ -1195,9 +1234,40 @@ async function enTransaccion(periodoId, accion) {
   }
 }
 
+// Diferencia pasada a gastos: cuando el banco tiene, por ejemplo, 1.200.521 y
+// el mayor 1.200.000, la contadora concilia los dos y los 521 los suma en el
+// asiento de gastos (de este mes o del siguiente). Se agregan dos renglones
+// del lado del banco: uno que entra en el cruce y lo deja exacto, y su
+// opuesto, que queda pendiente como gasto ("Diferencias a imputar en gastos")
+// y pasa al mes siguiente al cerrar, para conciliarlo con el asiento de gastos.
+const RUBRO_DIFERENCIAS = "Diferencias a imputar en gastos";
+const CLAVE_AJUSTE = (numero, n) => `B|AJUSTE|${numero}|${n}`;
+
+async function agregarAjusteGastos(req, periodoId, movs, diferencia) {
+  const rNumero = await req().query("SELECT ISNULL(MAX(numero), 0) + 1 AS numero FROM conc_cruces WHERE periodo_id = @periodoId");
+  const numero = rNumero.recordset[0].numero;
+  const rMovs = await req().query(`SELECT MAX(fecha) AS fecha, MAX(orden) AS orden FROM conc_movimientos
+    WHERE id IN (${movs.map((m) => m.id).join(",")})`);
+  const { fecha, orden } = rMovs.recordset[0];
+  const insertar = (n, importe, rubro) => req()
+    .input("clave", sql.NVarChar, CLAVE_AJUSTE(numero, n))
+    .input("orden", sql.Int, (orden || 0) + n)
+    .input("fecha", sql.Date, fecha)
+    .input("concepto", sql.NVarChar, n === 1 ? `Diferencia del cruce N° ${numero} (pasa a gastos)`
+      : `Diferencia del cruce N° ${numero} (a imputar en gastos)`)
+    .input("importe", sql.Decimal(18, 2), importe)
+    .input("rubro", sql.NVarChar, rubro)
+    .query(`INSERT INTO conc_movimientos (periodo_id, lado, clave, orden, fecha, concepto, importe, por_acreditar, rubro_gasto)
+            OUTPUT inserted.id VALUES (@periodoId, 'B', @clave, @orden, @fecha, @concepto, @importe, 0, @rubro)`);
+  const r1 = await insertar(1, diferencia, RUBRO_DIFERENCIAS);
+  await insertar(2, -diferencia, RUBRO_DIFERENCIAS);
+  return r1.recordset[0].id;
+}
+
 // Concilia a mano los movimientos elegidos (uno o varios de cada lado). Si son
 // de un solo lado, tienen que anularse entre sí (asiento y contraasiento).
-async function crearCruceManual(periodoId, idsPedidos, usuarioId, nota) {
+// diferenciaAGastos: si hay diferencia, queda pendiente como gasto (ver arriba).
+async function crearCruceManual(periodoId, idsPedidos, usuarioId, nota, diferenciaAGastos = false) {
   const ids = [...new Set(listaIds(idsPedidos))];
   if (!ids.length) throw new ErrorConciliacion("No hay movimientos elegidos.");
   return enTransaccion(periodoId, async (req) => {
@@ -1213,9 +1283,14 @@ async function crearCruceManual(periodoId, idsPedidos, usuarioId, nota) {
       throw new ErrorConciliacion("Si elegís movimientos de un solo lado, tienen que anularse entre sí (sumar cero).");
     }
     await descartarPropuestasDe(req, ids, usuarioId);
-    const regla = hayMayor && hayBanco
+    let regla = hayMayor && hayBanco
       ? (movs.some((m) => m.lado === "A") ? "Mes anterior (manual)" : "Manual")
       : hayMayor ? "Anulados en mayor (manual)" : "Anulados en banco (manual)";
+    if (diferenciaAGastos && diferencia !== 0) {
+      ids.push(await agregarAjusteGastos(req, periodoId, movs, diferencia));
+      regla += ", diferencia a gastos";
+      diferencia = 0;
+    }
     return insertarCruce(req, periodoId, { ids, regla, nota, estado: "conciliado", diferencia, usuarioId });
   });
 }
@@ -1278,10 +1353,31 @@ async function resolverCruce(cruceId, accion, usuarioId) {
       if (cruce.estado === "rechazado" || cruce.estado === "a_confirmar") {
         throw new ErrorConciliacion("Eso no está conciliado.");
       }
+      // Si la diferencia se había pasado a gastos, sus dos renglones se van con
+      // el cruce (salvo que el pendiente ya se haya usado en otro cruce).
+      const rAjuste = await q().query(`
+        SELECT a.id, a.clave,
+               (SELECT COUNT(*) FROM conc_cruce_items ci2 JOIN conc_cruces c2 ON c2.id = ci2.cruce_id
+                WHERE ci2.movimiento_id = par.id AND c2.deshecho = 0 AND c2.id <> @id
+                  AND c2.estado IN ('conciliado', 'mes_siguiente')) AS usado,
+               par.id AS par_id
+        FROM conc_cruce_items ci
+        JOIN conc_movimientos a ON a.id = ci.movimiento_id AND a.clave LIKE 'B|AJUSTE|%|1'
+        LEFT JOIN conc_movimientos par ON par.periodo_id = a.periodo_id
+          AND par.clave = LEFT(a.clave, LEN(a.clave) - 1) + '2'
+        WHERE ci.cruce_id = @id
+      `);
+      if (rAjuste.recordset.some((a) => a.usado)) {
+        throw new ErrorConciliacion("La diferencia de este cruce ya se concilió con un asiento de gastos: deshacé ese cruce primero.");
+      }
       await q().query(`
         UPDATE conc_cruces SET deshecho = 1, deshecho_por = @usuarioId, fecha_deshecho = GETDATE()
         WHERE id = @id AND deshecho = 0
       `);
+      const idsAjuste = rAjuste.recordset.flatMap((a) => [a.id, a.par_id]).filter(Boolean);
+      if (idsAjuste.length) {
+        await req().query(`UPDATE conc_movimientos SET lado = 'X' WHERE id IN (${idsAjuste.join(",")})`);
+      }
     } else {
       throw new ErrorConciliacion("Acción inválida.");
     }

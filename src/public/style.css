@@ -729,6 +729,7 @@ main {
 }
 
 .form-usuario button:hover { background: var(--verde-oscuro); }
+.ayuda-admin { color: var(--texto-secundario); font-size: 0.9rem; margin: -0.3rem 0 0.8rem; }
 
 .tabla-usuarios {
   width: 100%;

@@ -33,7 +33,8 @@ GASTOS = [
     ('Intereses', re.compile(r'INTERES', re.I)),
     ('Seguros', re.compile(r'SEGUR', re.I)),
 ]
-ASIENTO_GASTOS = re.compile(r'G\.? ?BANC|GASTO')
+TIPO_GASTOS_MES_SIGUIENTE = 'Gastos: a conciliar el mes siguiente'
+ASIENTO_GASTOS = re.compile(r'G\.? ?BANC|GASTO|LEY\s*(NRO\.?\s*)?25\.?413|LEY D/?C|SIRCREB', re.I)
 VALORES = re.compile(r'VALORES AL COBRO')
 CUIT_PROPIO = '30619630056'
 PROPIAS = re.compile(CUIT_PROPIO + r'|PROPIAS|IGUAL TIT|MISMO TIT|ASOC\w*\.? ?MUT', re.I)
@@ -93,7 +94,7 @@ def subconjunto(objetivo, candidatos, tol=0):
     return mejor[1] if mejor else None
 
 
-def conciliar(mayor, banco, banco_ant):
+def conciliar(mayor, banco, banco_ant, banco_cod=None):
     """Cruza los movimientos. Devuelve la lista de grupos conciliados."""
     for lista in (mayor, banco, banco_ant):
         for x in lista:
@@ -109,7 +110,7 @@ def conciliar(mayor, banco, banco_ant):
     pares = []
     for i, m in enumerate(mayor):
         for j, b in enumerate(banco):
-            if b['importe'] == m['importe'] and b['importe'] != 0:
+            if b['importe'] == m['importe'] and b['importe'] != 0 and not rubro_gasto(b['concepto']):
                 d = abs((b['fecha'] - m['fecha']).days)
                 if d <= DIAS_1A1:
                     pares.append((d, -parecido(m, b), i, j, m, b))
@@ -191,7 +192,7 @@ def conciliar(mayor, banco, banco_ant):
     for m in mayor:
         if m['ok'] or m['importe'] == 0:
             continue
-        cands = [b for b in banco if not b['ok'] and b['importe'] * m['importe'] > 0
+        cands = [b for b in banco if not b['ok'] and b['importe'] * m['importe'] > 0 and not rubro_gasto(b['concepto'])
                  and abs(b['importe'] - m['importe']) <= TOL_CENTAVOS and abs((b['fecha'] - m['fecha']).days) <= 3]
         if len(cands) == 1:
             dif = round(m['importe'] - cands[0]['importe'], 2)
@@ -201,7 +202,7 @@ def conciliar(mayor, banco, banco_ant):
     for m in mayor:
         if m['ok'] or m['importe'] == 0:
             continue
-        cands = [b for b in banco if not b['ok'] and b['importe'] == m['importe']]
+        cands = [b for b in banco if not b['ok'] and b['importe'] == m['importe'] and not rubro_gasto(b['concepto'])]
         otros = [x for x in mayor if not x['ok'] and x['importe'] == m['importe']]
         if len(cands) == 1 and len(otros) == 1:
             dias = abs((cands[0]['fecha'] - m['fecha']).days)
@@ -244,19 +245,59 @@ def conciliar(mayor, banco, banco_ant):
                         cerrar(tipo, [a, c], [], 'Asiento y su contraasiento')
                     break
 
-    # 5) Asiento global de gastos bancarios contra la suma de gastos del resumen
-    for m in mayor:
-        if m['ok'] or m['importe'] >= 0 or not ASIENTO_GASTOS.search(m['concepto']):
+    # 4b) Asiento mal cargado (ej. de otro banco) y su contraasiento más adelante
+    #     en el mes: importe opuesto, sin límite de días, si es el único posible.
+    for a in mayor:
+        if a['ok'] or a['importe'] == 0:
             continue
-        for lista, tipo in ((banco, 'Gastos bancarios'), (banco_ant, 'Gastos mes anterior')):
-            gs = [b for b in lista if not b['ok'] and rubro_gasto(b['concepto'])]
-            dif = round(m['importe'] - sum(b['importe'] for b in gs), 2)
-            if gs and abs(dif) <= abs(m['importe']) * TOL_GASTOS:
-                nota = f'Suma de {len(gs)} gastos del resumen'
+        cands = [c for c in mayor if not c['ok'] and c is not a and c['importe'] == -a['importe']]
+        iguales = [x for x in mayor if not x['ok'] and x['importe'] == a['importe']]
+        if len(cands) == 1 and len(iguales) == 1:
+            dias = abs((cands[0]['fecha'] - a['fecha']).days)
+            cerrar('Anulados en mayor', [a, cands[0]], [],
+                   f'Asiento y su contraasiento, {dias} días después' if dias else 'Asiento y su contraasiento')
+
+    # 5) Asientos de gastos bancarios contra los gastos del resumen ANTERIOR: la
+    #    mutual asienta los gastos de un mes en el mes siguiente. Un asiento
+    #    puede ser el total o uno o varios rubros (en el Nación: mantenimiento,
+    #    Ley 25413 y SIRCREB); se elige la combinación más justa.
+    asientos = sorted([m for m in mayor if not m['ok'] and m['importe'] < 0
+                       and ASIENTO_GASTOS.search(m['concepto'])], key=lambda m: m['importe'])
+    for m in asientos:
+        for lista, tipo, donde in ((banco_ant, 'Gastos mes anterior', 'del resumen anterior'),):
+            rubros = {}
+            for b in lista:
+                r = not b['ok'] and b['importe'] != 0 and rubro_gasto(b['concepto'], banco_cod)
+                if r:
+                    rubros.setdefault(r, []).append(b)
+            mejor = None
+            nombres = sorted(rubros)
+            for n in range(len(nombres), 0, -1):
+                for combo in combinations(nombres, n):
+                    gs = [b for r in combo for b in rubros[r]]
+                    dif = round(m['importe'] - sum(b['importe'] for b in gs), 2)
+                    if abs(dif) <= abs(m['importe']) * TOL_GASTOS and (mejor is None or abs(dif) < abs(mejor[0])):
+                        mejor = (dif, combo, gs)
+            if mejor:
+                dif, combo, gs = mejor
+                nota = (f'Suma de {len(gs)} gastos {donde}'
+                        + (f" ({', '.join(combo)})" if len(combo) < len(nombres) else ''))
                 if dif:
                     nota += f'; el asiento difiere en {dif:,.2f} de esa suma'
                 cerrar(tipo, [m], gs, nota)
                 break
+
+    # 6) Los gastos del resumen DEL MES no se concilian: su asiento va a estar en
+    #    el mayor del mes siguiente. Se agrupan por rubro como "a conciliar el mes
+    #    siguiente" (siguen pendientes: no se marcan ok y pasan al mes que viene).
+    rubros = {}
+    for b in banco:
+        r = not b['ok'] and b['importe'] != 0 and rubro_gasto(b['concepto'], banco_cod)
+        if r:
+            rubros.setdefault(r, []).append(b)
+    for r, gs in rubros.items():
+        grupos.append({'tipo': TIPO_GASTOS_MES_SIGUIENTE, 'mayor': [], 'banco': gs,
+                       'nota': f'{r}: {len(gs)} gastos del resumen del mes; el asiento va en el mayor del mes siguiente'})
     return grupos
 
 
@@ -504,7 +545,7 @@ def cargar(nombre, mes, anio):
     mes_ant, anio_ant = (mes - 1, anio) if mes > 1 else (12, anio - 1)
     anterior = leer_resumen(nombre, BASE, mes_ant, anio_ant)
     banco_ant = anterior[1] if anterior else []
-    grupos = conciliar(mayor, banco, banco_ant)
+    grupos = conciliar(mayor, banco, banco_ant, nombre)
     return im, ib, mayor, banco, banco_ant, grupos, anterior is not None
 
 

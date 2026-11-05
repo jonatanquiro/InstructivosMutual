@@ -684,19 +684,24 @@
           "Tildá también lo que corresponde del otro lado.", [{ valor: true, texto: "Entendido" }]);
         return;
       }
+      let diferenciaAGastos = false;
       if (!unSoloLado && Math.abs(s.dif) >= 0.005) {
         const ok = await preguntar(`Entre el mayor y el banco hay una diferencia de $ ${importe(s.dif)}. ` +
-          "¿Conciliar igual? La diferencia queda registrada y aparece en el control de saldos.", [
+          "¿Conciliar igual? Podés dejar la diferencia registrada en este cruce, o pasarla a gastos: " +
+          "queda pendiente como «Diferencias a imputar en gastos» hasta que la concilies con el asiento de gastos " +
+          "(si no, pasa al mes siguiente al cerrar).", [
+          { valor: "gastos", texto: "Conciliar y pasar la diferencia a gastos" },
           { valor: true, texto: "Conciliar con diferencia" },
           { valor: false, texto: "Cancelar", secundario: true },
         ]);
         if (!ok) return;
+        diferenciaAGastos = ok === "gastos";
       }
       try {
         await pedirJson(`/api/conciliacion/periodos/${periodoId}/cruces`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ movimientos: [...tildados] }),
+          body: JSON.stringify({ movimientos: [...tildados], diferenciaAGastos }),
         });
         tildados.clear();
       } catch (error) {

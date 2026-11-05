@@ -396,10 +396,10 @@ router.get("/periodos/:id", async (req, res) => {
 // Conciliar a mano los movimientos tildados en el punteo.
 router.post("/periodos/:id/cruces", async (req, res) => {
   const id = Number(req.params.id);
-  const { movimientos, nota } = req.body;
+  const { movimientos, nota, diferenciaAGastos } = req.body;
   if (!Number.isInteger(id) || !Array.isArray(movimientos)) return res.status(400).json({ error: "Pedido inválido" });
   try {
-    const cruceId = await datos.crearCruceManual(id, movimientos, req.session.usuarioId, nota);
+    const cruceId = await datos.crearCruceManual(id, movimientos, req.session.usuarioId, nota, diferenciaAGastos === true);
     res.json({ ok: true, cruceId });
   } catch (error) {
     if (error instanceof datos.ErrorConciliacion) return res.status(409).json({ error: error.message });

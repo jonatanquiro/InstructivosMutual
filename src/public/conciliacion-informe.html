@@ -103,7 +103,10 @@
     }
 
     function descripcion(r) {
-      if (r.gasto) return esc(r.concepto);
+      if (r.gasto) {
+        return esc(r.concepto) + (r.mes_siguiente ? " <em>a conciliar mes sig.</em>"
+          : r.arrastrado ? " <em>del mes anterior</em>" : "");
+      }
       const dia = r.fecha ? ` (${fechaCorta(r.fecha).slice(0, 5)})` : "";
       let texto = r.diferencia ? `Diferencia conciliado: ${r.concepto}` : r.concepto;
       if (r.detalle && !r.diferencia) texto += ` – ${r.detalle}`;

@@ -73,7 +73,7 @@ def cmd_conciliar(base, banco, mes, anio):
     ib, banco_movs, archivos_mes, detalle_banco = actual
     banco_ant, archivos_ant = del_mes_anterior(ext, banco, base, mes, anio)
     lista_avisos = avisos(ext, banco, base, mes, anio)
-    grupos = conciliar(mayor, banco_movs, banco_ant)
+    grupos = conciliar(mayor, banco_movs, banco_ant, banco)
     c = cuadre(im, ib, mayor, banco_movs, grupos)
 
     _claves(mayor, 'M')
